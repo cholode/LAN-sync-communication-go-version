@@ -1,0 +1,65 @@
+
+services:
+  # 核心数据存储服务 (MySQL)
+  db:
+    image: mysql:8.0
+    container_name: lansync_go_mysql
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: root_password_123
+      MYSQL_DATABASE: lansync_db
+    ports:
+      # 映射宿主机3306端口，便于本地数据库管理工具连接
+      - "3306:3306"
+    volumes:
+      # 持久化MySQL数据目录，容器销毁后数据不丢失
+      - mysql_data:/var/lib/mysql
+    command: --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
+    # MySQL健康检查探针
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-proot_password_123"]
+      interval: 5s
+      timeout: 3s
+      retries: 3
+  # 高并发业务网关服务 (Go后端)
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    container_name: lansync_go_backend
+    restart: always
+    ports:
+      # 映射宿主机8080端口，便于直接进行API测试或压测
+      - "8080:8080"
+
+    depends_on:
+      db:
+        # 依赖MySQL健康检查通过后再启动，避免连接失败
+        condition: service_healthy
+    environment:
+      - TZ=Asia/Shanghai
+      - DB_HOST=db
+      - DB_PORT=3306
+      - DB_USER=root
+      - DB_PASSWORD=root_password_123
+      - DB_NAME=lansync_db
+  # 静态资源与反向代理服务 (Nginx)
+  nginx:
+    image: nginx:alpine
+    container_name: lansync_go_nginx
+    restart: always
+    ports:
+      - "80:80"
+    volumes:
+      # 挂载本地前端静态资源目录
+      - ./frontend:/usr/share/nginx/html
+      # 挂载本地Nginx反向代理配置目录
+      - ./nginx_conf:/etc/nginx/conf.d
+    depends_on:
+      # 依赖Go后端启动后再启动
+      - web
+    environment:
+      - TZ=Asia/Shanghai
+# 声明持久化卷
+volumes:
+  mysql_data:

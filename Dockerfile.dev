@@ -1,0 +1,20 @@
+# 设置底层
+FROM golang:alpine
+
+#设置工作目录，锚定目录app/
+WORKDIR /app
+
+#换上国内代理
+ENV GOPROXY=https://goproxy.cn,https://mirrors.aliyun.com/goproxy/,direct
+ENV GOSUMDB=off
+ENV GO111MODULE=on
+
+COPY . .
+
+RUN go mod tidy
+
+RUN go build -o main .
+# ENV GOSUMDB=off
+
+
+CMD [ "./main" ]
