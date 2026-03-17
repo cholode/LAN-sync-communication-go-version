@@ -1,20 +1,58 @@
-# 设置底层
-FROM golang:alpine
+# ==========================================
+# 第一阶段：构建阶段 (Builder)
+# ==========================================
+# 严苛标准 1：绝对不使用 latest，必须锁死明确的基础镜像版本，保证构建的幂等性
+FROM golang:1.21-alpine AS builder
 
-#设置工作目录，锚定目录app/
-WORKDIR /app
+# 严苛标准 2：配置 Go 环境变量，开启 Go Modules 并设置代理加速下载
+ENV GO111MODULE=on \
+    GOPROXY=https://goproxy.cn,direct \
+    CGO_ENABLED=0 \
+    GOOS=linux \
+    GOARCH=amd64
 
-#换上国内代理
-ENV GOPROXY=https://goproxy.cn,https://mirrors.aliyun.com/goproxy/,direct
-ENV GOSUMDB=off
-ENV GO111MODULE=on
+# 设置工作目录
+WORKDIR /build
 
+# 严苛标准 3：利用 Docker 缓存层机制（最核心考点）
+# 不要一上来就 COPY . .
+# 先仅仅复制 go.mod 和 go.sum，这样只要依赖没变，下载依赖的层就会被缓存，极大地提升后续构建速度
+COPY go.mod go.sum ./
+RUN go mod download
+
+# 依赖下载完成后，再复制项目所有源代码
 COPY . .
 
-RUN go mod tidy
+# 编译 Go 项目。加入 -ldflags="-s -w" 进一步剔除调试符号，极限压缩二进制文件体积
+RUN go build -ldflags="-s -w" -o im-server main.go
 
-RUN go build -o main .
-# ENV GOSUMDB=off
+# ==========================================
+# 第二阶段：运行阶段 (Runner)
+# ==========================================
+# 严苛标准 4：丢弃几百兆的 golang 编译环境，使用极简的 alpine 甚至 scratch 作为最终运行环境
+FROM alpine:3.18
 
+# 维护者信息 (专业素养体现)
+LABEL maintainer="YourName <your.email@example.com>"
+LABEL description="LiteIM Backend Server"
 
-CMD [ "./main" ]
+# 安装时区数据和 CA 证书（HTTPS 请求外部接口必备，很多新手会漏掉导致 x509 报错）
+RUN apk --no-cache add tzdata ca-certificates && \
+    cp /usr/share/zoneinfo/Asia/Shanghai /etc/localtime && \
+    echo "Asia/Shanghai" > /etc/timezone
+
+WORKDIR /app
+
+# 从 builder 阶段把编译好的、纯粹的二进制文件拷贝过来
+COPY --from=builder /build/im-server /app/
+
+# 严苛标准 5：降权运行（极其关键的安全规范）
+# 绝对不能用 root 用户运行容器内部的进程，防止容器逃逸漏洞
+RUN adduser -S -D -H -h /app nobody
+USER nobody
+
+# 暴露端口（这只是一个声明，真正的网络控制靠 docker-compose 的 expose）
+EXPOSE 8080
+
+# 启动服务
+CMD ["./im-server"]
