@@ -51,6 +51,7 @@ func WsEndpoint(hub *core.Hub, c *gin.Context) {
 		Hub:  hub,
 		Conn: conn,
 		// 带缓冲通道：防止高并发阻塞（你之前学的channel最佳实践）
+		//UserId: userID;
 		Send: make(chan []byte, 256),
 	}
 

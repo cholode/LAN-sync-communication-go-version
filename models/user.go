@@ -12,6 +12,7 @@ type User struct {
 	Username  string `gorm:"type:varchar(64);uniqueIndex;not null;comment:'登录用户名'"`
 	Password  string `gorm:"type:varchar(255);not null;comment:'Bcrypt哈希密码'"`
 	Avatar    string `gorm:"type:varchar(255);default:'';comment:'用户头像URL'"`
+	Role      int8   `gorm:"type:tinyint;not null;default:0;comment:'0:普通用户 1:超管'"`
 	CreatedAt time.Time
 	UpdatedAt time.Time
 	DeletedAt gorm.DeletedAt `gorm:"index"` // 软删除标记
