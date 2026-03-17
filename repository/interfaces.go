@@ -72,9 +72,9 @@ var (
 // InitRepositories 依赖注入引擎
 // 必须在 main.go 中基础设施 (MySQL 连接池) 启动后，立刻调用此方法
 func InitRepositories(db *gorm.DB) {
-	// 严苛提醒：这里的 NewXXXImpl 方法我们需要在各自的物理文件中实现
-	// User = NewUserRepoImpl(db)
-	// Room = NewRoomRepoImpl(db)
-	// RoomMember = NewRoomMemberRepoImpl(db)
-	// Message = NewMessageRepoImpl(db)
+	// 提醒：这里的 NewXXXImpl 方法我们需要在各自的物理文件中实现
+	User = NewUserRepoImpl(db)
+	Room = NewRoomRepoImpl(db)
+	RoomMember = NewRoomMemberRepoImpl(db)
+	Message = NewMessageRepoImpl(db)
 }
