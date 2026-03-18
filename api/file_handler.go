@@ -2,83 +2,187 @@ package api
 
 import (
 	"fmt"
-	"log"
+	"io"
 	"net/http"
+	"os"
 	"path/filepath"
 	"strconv"
-	"time"
+	//"strings"
 
 	"github.com/gin-gonic/gin"
-	"lan-im-go/core" // 引入你的 Hub 所在的包
 )
 
-// UploadFile 处理大文件上传，并在落盘后触发全群广播
-// 严苛细节：通过闭包将全局的 hub 实例注入到 Gin 的 Handler 中
-func UploadFile(hub *core.Hub) gin.HandlerFunc {
-	return func(c *gin.Context) {
-		// 1. 解析业务参数 (发送者ID, 目标房间ID)
-		senderIDStr := c.PostForm("sender_id")
-		roomIDStr := c.PostForm("room_id")
-		senderID, _ := strconv.ParseInt(senderIDStr, 10, 64)
-		roomID, _ := strconv.ParseInt(roomIDStr, 10, 64)
-		if senderID == 0 || roomID == 0 {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "缺失关键业务参数"})
-			return
-		}
+const (
+	UploadBaseDir = "./data/uploads"
+	TempChunkDir  = "./data/temp_chunks"
+)
 
-		// 2. 接收文件流
-		file, err := c.FormFile("file")
-		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "获取文件失败"})
-			return
-		}
-
-		// 严苛细节：为了防止同名文件覆盖，必须重命名文件 (这里用时间戳简易代替)
-		filename := fmt.Sprintf("%d_%s", time.Now().UnixNano(), filepath.Base(file.Filename))
-		savePath := filepath.Join("./data/uploads", filename)
-
-		// 3. 执行物理落盘 (这里 Gin 底层会使用 io.Copy 高效写入)
-		if err := c.SaveUploadedFile(file, savePath); err != nil {
-			log.Printf("[Upload] 文件落盘失败: %v", err)
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "文件保存失败"})
-			return
-		}
-
-		// 4. 落盘成功！开始构造要广播的群聊消息
-		// 假设你的 Nginx 或后端下载接口配置为 /api/download/xxx
-		downloadURL := fmt.Sprintf("/api/download/%s", filename)
-		msg := &core.Message{
-			MsgID:    time.Now().UnixNano(), // 实际应替换为雪花算法 ID
-			SenderID: senderID,
-			RoomID:   roomID,
-			// 组装供前端解析的特制文件消息结构
-			Content: fmt.Sprintf(`{"type":"file", "name":"%s", "url":"%s", "size":%d}`, file.Filename, downloadURL, file.Size),
-		}
-
-		// 5. 跨模块异步投递：将消息扔给 Hub 进行内存路由和异步入库
-		// 注意这里是非阻塞投递，保证 HTTP 接口能极速向前端返回 200 OK
-		select {
-		case hub.Broadcast <- msg:
-			log.Printf("[Upload] 文件 %s 落盘完毕，已通知 Hub 广播至 Room %d", filename, roomID)
-		default:
-			log.Printf("[Upload 警告] Hub Broadcast 队列满，文件通知投递失败！")
-		}
-
-		// 6. 响应前端 HTTP 请求
-		c.JSON(http.StatusOK, gin.H{
-			"msg": "文件上传成功并已广播",
-			"url": downloadURL,
-		})
-	}
+func InitFileDirs() {
+	os.MkdirAll(UploadBaseDir, 0755)
+	os.MkdirAll(TempChunkDir, 0755)
 }
 
-// Downloadfile 就是你提到的下载方法，利用 Go 底层极速的零拷贝/流式下发
-func Downloadfile() gin.HandlerFunc {
-	return func(c *gin.Context) {
-		filename := c.Param("filename")
-		// 防止目录穿越漏洞 (Directory Traversal) 的安全校验
-		cleanPath := filepath.Clean(filepath.Join("./data/uploads", filename))
-		// Gin 内置的极强方法，自动处理 MIME 类型和分块传输
-		c.File(cleanPath)
+// ============================================================================
+// 【断点续传：第 0 阶段 - 战损探针与秒传检测】
+// 前端在上传任何文件前，必须先调用此接口
+// ============================================================================
+func CheckUploadStatus(c *gin.Context) {
+	fileHash := c.Query("hash")
+	fileName := c.Query("filename")
+	if fileHash == "" || fileName == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "参数缺失"})
+		return
 	}
+
+	safeFileName := filepath.Base(fileName)
+	finalFilePath := filepath.Join(UploadBaseDir, fmt.Sprintf("%s_%s", fileHash, safeFileName))
+
+	// 1. 终极白嫖 (秒传机制)：如果最终文件已经存在，直接告诉前端“传完了”，瞬间 100%
+	if _, err := os.Stat(finalFilePath); err == nil {
+		c.JSON(http.StatusOK, gin.H{
+			"status":       "completed",
+			"msg":          "文件已秒传",
+			"download_url": fmt.Sprintf("/api/v1/download/%s_%s", fileHash, safeFileName),
+		})
+		return
+	}
+
+	// 2. 断点战损扫描：去临时目录清点尸体
+	chunkDirPath := filepath.Join(TempChunkDir, filepath.Clean(fileHash))
+	var uploadedChunks []int
+
+	// 读取目录下的所有切片文件
+	entries, err := os.ReadDir(chunkDirPath)
+	if err == nil {
+		for _, entry := range entries {
+			if !entry.IsDir() {
+				// 将切片文件名 (如 "0", "1", "2") 解析为数字并存入数组
+				if index, err := strconv.Atoi(entry.Name()); err == nil {
+					uploadedChunks = append(uploadedChunks, index)
+				}
+			}
+		}
+	}
+
+	// 3. 将已经存在的切片索引返回给前端，前端拿到后，只需上传缺少的切片
+	c.JSON(http.StatusOK, gin.H{
+		"status":          "uploading",
+		"uploaded_chunks": uploadedChunks,
+	})
+}
+
+// ============================================================================
+// 【断点续传：第一阶段 - 接收分片 (支持并发写与覆盖写)】
+// ============================================================================
+func UploadChunk(c *gin.Context) {
+	fileHash := c.PostForm("hash")
+	chunkIndexStr := c.PostForm("chunk_index")
+	chunkIndex, err := strconv.Atoi(chunkIndexStr)
+	if err != nil || fileHash == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "非法的分片参数"})
+		return
+	}
+
+	fileHeader, err := c.FormFile("chunk")
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "无法读取文件流"})
+		return
+	}
+
+	chunkDirPath := filepath.Join(TempChunkDir, filepath.Clean(fileHash))
+	os.MkdirAll(chunkDirPath, 0755)
+
+	// OS 级魔法：如果之前有传了一半的废弃切片，这里会自动 O_TRUNC 截断并覆盖重写
+	chunkFilePath := filepath.Join(chunkDirPath, strconv.Itoa(chunkIndex))
+	if err := c.SaveUploadedFile(fileHeader, chunkFilePath); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "分片物理落盘失败"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"msg": fmt.Sprintf("分片 %d 上传成功", chunkIndex)})
+}
+
+// ============================================================================
+// 【断点续传：第二阶段 - 物理级顺序合并】
+// ============================================================================
+func MergeChunks(c *gin.Context) {
+	fileHash := c.PostForm("hash")
+	fileName := c.PostForm("filename")
+	totalChunksStr := c.PostForm("total_chunks")
+	totalChunks, err := strconv.Atoi(totalChunksStr)
+	if err != nil || fileHash == "" || fileName == "" || totalChunks <= 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "合并参数缺失或非法"})
+		return
+	}
+
+	safeFileName := filepath.Base(fileName)
+	finalFilePath := filepath.Join(UploadBaseDir, fmt.Sprintf("%s_%s", fileHash, safeFileName))
+
+	// 严苛防御：如果别人正在合并，或者已经合并完了，拒绝重复触发
+	if _, err := os.Stat(finalFilePath); err == nil {
+		c.JSON(http.StatusOK, gin.H{"msg": "文件已存在，无需重复合并"})
+		return
+	}
+
+	finalFile, err := os.OpenFile(finalFilePath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "无法创建最终文件"})
+		return
+	}
+	defer finalFile.Close()
+
+	chunkDirPath := filepath.Join(TempChunkDir, filepath.Clean(fileHash))
+
+	// 必须严格串行写入，保证底层 SSD 发挥最大顺序写带宽，绝不并发！
+	for i := 0; i < totalChunks; i++ {
+		chunkFilePath := filepath.Join(chunkDirPath, strconv.Itoa(i))
+		chunkFile, err := os.Open(chunkFilePath)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("分片 %d 缺失，合并被强行中止", i)})
+			// 发生严重断层，必须删掉这个半残的最终文件，防止脏数据累积
+			os.Remove(finalFilePath)
+			return
+		}
+
+		_, err = io.Copy(finalFile, chunkFile)
+		chunkFile.Close()
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "合并磁盘 I/O 异常"})
+			os.Remove(finalFilePath)
+			return
+		}
+	}
+
+	// 阅后即焚：合并成功后抹除所有的临时切片垃圾
+	os.RemoveAll(chunkDirPath)
+
+	c.JSON(http.StatusOK, gin.H{
+		"msg":          "文件合并成功",
+		"download_url": fmt.Sprintf("/api/v1/download/%s_%s", fileHash, safeFileName),
+	})
+}
+
+// ============================================================================
+// 【极速下载：降维打击的 OS 级零拷贝】
+// ============================================================================
+func DownloadFile(c *gin.Context) {
+	fileName := c.Param("filename")
+	// 防御目录穿越攻击 (Path Traversal)
+	// 如果黑客传 /download/../../../../etc/shadow，会被 Clean 掉并只取 Base
+	safeFileName := filepath.Base(filepath.Clean(fileName))
+
+	// 防止有人传空文件名试图拉取整个目录
+	if safeFileName == "." || safeFileName == "/" || safeFileName == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "非法的文件请求"})
+		return
+	}
+
+	filePath := filepath.Join(UploadBaseDir, safeFileName)
+	if _, err := os.Stat(filePath); os.IsNotExist(err) {
+		c.JSON(http.StatusNotFound, gin.H{"error": "文件已被超管物理销毁或不存在"})
+		return
+	}
+
+	// 触发底层 sendfile 系统调用
+	c.File(filePath)
 }
