@@ -24,7 +24,7 @@ func main() {
 	}
 
 	// 初始化数据库连接池并执行 AutoMigrate 建表
-	// 严苛要求：如果这里连不上数据库，程序必须直接 panic/fatal 退出，绝对不能带病启动！
+	// 如果这里连不上数据库，程序必须直接 panic/fatal 退出，绝对不能带病启动！
 	infrastructure.InitDatabase(dsn)
 
 	// ========================================================================
@@ -65,14 +65,14 @@ func main() {
 	{
 		// WebSocket 握手升级大门 (依赖注入了全局唯一 hub)
 		authorized.GET("/ws", func(c *gin.Context) {
-			api.WsEndpoint(hub, c)
+			api.WsEndpoint(hub)
 		})
 
 		// 断点续传与文件流转体系
-		authorized.GET("/upload/status", api.CheckUploadStatus) // 战损探针
-		authorized.POST("/upload/chunk", api.UploadChunk)       // 分片上传
-		authorized.POST("/upload/merge", api.MergeChunks)       // 物理合并
-
+		authorized.GET("/upload/status", api.CheckUploadStatus)    // 战损探针
+		authorized.POST("/upload/chunk", api.UploadChunk)          // 分片上传
+		authorized.POST("/upload/merge", api.MergeChunks)          // 物理合并
+		authorized.GET("/room/:id/messages", api.GetChatHistory()) //历史记录拉取
 		// 极速零拷贝下载 (注意：实际业务中下载可能不需要鉴权以方便分享，视产品需求而定。严苛起见，我们这里放在鉴权区)
 		authorized.GET("/download/:filename", api.DownloadFile)
 	}

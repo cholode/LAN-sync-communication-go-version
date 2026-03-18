@@ -5,8 +5,8 @@ import (
 	"strconv"
 
 	"github.com/gin-gonic/gin"
-
 	"lan-im-go/core"
+	"lan-im-go/models"
 	"lan-im-go/repository"
 )
 
@@ -60,7 +60,7 @@ func AdminDeleteRoom(hub *core.Hub) gin.HandlerFunc {
 		// 2. 控制面同步 (架构师的绝杀细节)：向该群聊的所有在线成员广播“群聊解散”系统信令
 		// 如果只删数据库，在线用户的群聊面板不会立刻消失，甚至还能在界面上打字，直到发送报错。
 		// 工业级的做法是：主动下发一条带有特殊标记的系统消息。
-		sysMsg := &core.Message{
+		sysMsg := &models.Message{
 			RoomID:   targetRoomID,
 			SenderID: 0, // 0 通常代表系统最高级别的上帝视角消息
 			Content:  "【系统通知】该群聊因违反相关规定，已被管理员强制解散",

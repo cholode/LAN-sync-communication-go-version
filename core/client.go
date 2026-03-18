@@ -1,41 +1,49 @@
 package core
 
 import (
-	//"bytes"
-	"github.com/gorilla/websocket"
-	//"os"
-	//"github.com/joho/godotenv"
+	"encoding/json"
 	"log"
 	"time"
+
+	"github.com/gorilla/websocket"
+	"lan-im-go/models"
 )
 
 const (
-	// 面试考点：必须设置超时机制，否则半开连接(死连接)会耗尽服务器文件描述符
-	writeWait      = 10 * time.Second
-	pongWait       = 60 * time.Second
-	pingPeriod     = (pongWait * 9) / 10
-	maxMessageSize = 4096 // 限制单条消息最大体积，防止恶意发大包打爆内存
+	// 工业级 WebSocket 调优参数
+	writeWait      = 10 * time.Second    // 写入超时时间
+	pongWait       = 60 * time.Second    // 期待前端心跳回应的超时时间
+	pingPeriod     = (pongWait * 9) / 10 // 服务端发送心跳包的频率 (必须小于 pongWait)
+	maxMessageSize = 4096                // 严防死守：限制单条消息最大体积(4KB)，防止恶意构造超大包打爆内存
 )
 
+// Client 物理连接包装
 type Client struct {
 	Hub    *Hub
 	UserID int64
 	Conn   *websocket.Conn
-
-	Send chan []byte // 专门用于下发消息的管道
+	// 发送缓冲通道：类型为 []byte 极大节省 CPU
+	Send chan []byte
 }
 
-// ReadPump 负责监听客户端发来的消息
+// Subscription 动作载体
+type Subscription struct {
+	Client  *Client
+	RoomIDs []int64 // 该操作涉及的房间集合
+}
+
+// ReadPump 读泵：将前端发来的二进制/文本流，反序列化并灌入 Hub 引擎
+// 严苛要求：每个连接有且仅有一个 goroutine 运行 ReadPump
 func (c *Client) ReadPump() {
+	// 物理崩溃/下线时的最终兜底方案
 	defer func() {
-		// 客户端断开或异常时，执行清理逻辑
-		// c.Hub.Unregister <- c
+		c.Hub.Unsubscribe <- &Subscription{Client: c, RoomIDs: nil} // 交给 Hub 去清理路由和关闭 Conn
 		c.Conn.Close()
 	}()
 
+	// 配置底层的读取限制与心跳感知
 	c.Conn.SetReadLimit(maxMessageSize)
 	c.Conn.SetReadDeadline(time.Now().Add(pongWait))
-	// 心跳机制：收到 Pong 响应时，重置读超时时间
 	c.Conn.SetPongHandler(func(string) error {
 		c.Conn.SetReadDeadline(time.Now().Add(pongWait))
 		return nil
@@ -45,22 +53,29 @@ func (c *Client) ReadPump() {
 		_, message, err := c.Conn.ReadMessage()
 		if err != nil {
 			if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure) {
-				log.Printf("异常断开: %v", err)
+				log.Printf("[ReadPump 异常] 用户 %d 连接异常断开: %v", c.UserID, err)
 			}
-			break
+			break // 退出循环，触发 defer 销毁
 		}
 
-		// 简单的去除两端空格处理
-		//message = bytes.TrimSpace(bytes.Replace(message, []byte{'\n'}, []byte{' '}, -1))
+		// 解析前端发来的业务 JSON
+		var msg models.Message
+		if err := json.Unmarshal(message, &msg); err != nil {
+			log.Printf("[防爆破] 用户 %d 发送了非法的 JSON 载荷", c.UserID)
+			continue
+		}
 
-		// 收到消息后，理论上应该解析 JSON (你之前定义的 payload)，
-		// 然后判断是存库还是转发。这里为了演示，直接投递给 Hub 的广播 channel
-		// c.Hub.Broadcast <- message
-		log.Printf("收到消息: %s", message)
+		// 零信任安全：绝对不能相信前端传过来的 SenderID！
+		// 必须在后端用 JWT 鉴权通过后的 Client.UserID 强行覆盖，防止冒名顶替！
+		msg.SenderID = c.UserID
+
+		// 压入 Hub 进行并发路由
+		c.Hub.Broadcast <- &msg
 	}
 }
 
-// WritePump 负责将服务端的数据下发给客户端
+// WritePump 写泵：从 Hub 引擎接收 []byte，并发往网卡缓冲区
+// 严苛要求：WebSocket 的 Write 操作不支持并发，必须被严格收敛在 WritePump 这一个协程里！
 func (c *Client) WritePump() {
 	ticker := time.NewTicker(pingPeriod)
 	defer func() {
@@ -71,24 +86,24 @@ func (c *Client) WritePump() {
 	for {
 		select {
 		case message, ok := <-c.Send:
-			// 监听业务层需要下发的消息
 			c.Conn.SetWriteDeadline(time.Now().Add(writeWait))
 			if !ok {
-				// Send channel 被关闭，服务端主动断开连接
+				// Hub 主动关闭了 Send 通道 (比如被踢下线)
 				c.Conn.WriteMessage(websocket.CloseMessage, []byte{})
 				return
 			}
 
+			// 直接将拿到的字节流写入 TCP
 			w, err := c.Conn.NextWriter(websocket.TextMessage)
 			if err != nil {
 				return
 			}
 			w.Write(message)
 
-			// 批量写入：如果通道里还有排队的消息，一并写进去，提升网络吞吐量
+			// 缓冲合并写入 (如果 Send 管道里积压了多条消息，一次性合并写入网卡，极大降低系统调用开销)
 			n := len(c.Send)
 			for i := 0; i < n; i++ {
-				w.Write([]byte{'\n'})
+				w.Write([]byte{'\n'}) // 可以用换行符分割
 				w.Write(<-c.Send)
 			}
 
@@ -96,10 +111,10 @@ func (c *Client) WritePump() {
 				return
 			}
 		case <-ticker.C:
-			// 定时触发心跳探测
+			// 定时发送 Ping 心跳包保活，防止被 Nginx 或运营商中间件切断 TCP 状态机
 			c.Conn.SetWriteDeadline(time.Now().Add(writeWait))
 			if err := c.Conn.WriteMessage(websocket.PingMessage, nil); err != nil {
-				return // 心跳发送失败，通常是因为客户端掉线，直接退出 Goroutine
+				return
 			}
 		}
 	}
