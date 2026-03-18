@@ -32,6 +32,8 @@ type Hub struct {
 	DBBuffer    chan *Message
 	Register    chan *Client
 	Unregister  chan *Client
+
+	Kick chan int64
 }
 
 func NewHub() *Hub {
@@ -43,6 +45,7 @@ func NewHub() *Hub {
 		DBBuffer:    make(chan *Message, 5000),
 		Register:    make(chan *Client),
 		Unregister:  make(chan *Client),
+		Kick:        make(chan int64),
 	}
 }
 
@@ -100,7 +103,13 @@ func (h *Hub) Run() {
 					}
 				}
 			}
+
+		case targetUserID := <-h.Kick:
+			if client, ok := h.clients[targetUserID]; ok {
+				client.Conn.Close()
+			}
 		}
+
 	}
 }
 

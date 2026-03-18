@@ -17,7 +17,7 @@ func JWTAuth() gin.HandlerFunc {
 		authHeader := c.GetHeader("Authorization")
 		if authHeader == "" {
 			c.JSON(http.StatusUnauthorized, gin.H{"error": "缺失 Authorization 请求头"})
-			c.Abort() // 拔枪击毙，严禁代码继续向后执行
+			c.Abort() // 严禁代码继续向后执行
 			return
 		}
 
@@ -38,7 +38,7 @@ func JWTAuth() gin.HandlerFunc {
 			return
 		}
 
-		// 4. B端管控的致命一击：防范幽灵 Token
+		// 4. 防范幽灵 Token
 		// 假如一个用户被超管软删除了，但他手里的 Token 还有 10 小时才过期怎么办？
 		// 必须在这里利用之前写好的 Repository 查一次库，确认该账号是否还合法存活！
 		user, err := repository.User.GetByID(claims.UserID)

@@ -5,10 +5,10 @@ import (
 	"os"
 
 	"github.com/gin-gonic/gin"
-
 	"lan-im-go/api"
 	"lan-im-go/core"
 	"lan-im-go/infrastructure"
+	"lan-im-go/middleware"
 	"lan-im-go/repository"
 )
 
@@ -47,38 +47,47 @@ func main() {
 	// ========================================================================
 	// Phase 4: API 路由接入层 (HTTP/WS Router)
 	// ========================================================================
-	// 生产环境中应切换为 gin.ReleaseMode
+	// 生产环境中应切换为 gin.SetMode(gin.ReleaseMode)
 	r := gin.Default()
 
-	// 1. 公共接口 (无需 Token)
+	// 【防线 1：公共开放区】 (零信任边缘，任何人可访问)
 	public := r.Group("/api/v1")
 	{
-		// 严苛预留：稍后我们将在这里实现真正的登录与注册
-		// public.POST("/login", api.LoginHandler)
-		// public.POST("/register", api.RegisterHandler)
+		// 严苛规范：注册和登录是全系统唯二暴露在公网的无鉴权接口
+		public.POST("/register", api.RegisterHandler)
+		public.POST("/login", api.LoginHandler)
 	}
 
-	// 2. C端用户鉴权接口 (需要 JWT Token)
-	// 注意：这里的 middleware.JWTAuth() 我们稍后实现
+	// 【防线 2：C 端用户鉴权区】 (核心业务区)
 	authorized := r.Group("/api/v1")
-	// authorized.Use(middleware.JWTAuth())
+	// 架构师的铁壁：只要进了这个 Group，必须带有合法的 JWT Token
+	authorized.Use(middleware.JWTAuth())
 	{
-		// WebSocket 握手升级大门 (注入了全局唯一 hub)
+		// WebSocket 握手升级大门 (依赖注入了全局唯一 hub)
 		authorized.GET("/ws", func(c *gin.Context) {
 			api.WsEndpoint(hub, c)
 		})
-		// 文件上传/下载入口
-		authorized.POST("/upload", api.UploadFile(hub))
-		authorized.GET("/download/:filename", api.Downloadfile())
+
+		// 断点续传与文件流转体系
+		authorized.GET("/upload/status", api.CheckUploadStatus) // 战损探针
+		authorized.POST("/upload/chunk", api.UploadChunk)       // 分片上传
+		authorized.POST("/upload/merge", api.MergeChunks)       // 物理合并
+
+		// 极速零拷贝下载 (注意：实际业务中下载可能不需要鉴权以方便分享，视产品需求而定。严苛起见，我们这里放在鉴权区)
+		authorized.GET("/download/:filename", api.DownloadFile)
 	}
 
-	// 3. B端超管隔离区 (需要双重鉴权：JWT + Role==1)
+	// 【防线 3：B 端超管绝对隔离区】 (最高权限区)
 	admin := r.Group("/api/v1/admin")
-	// admin.Use(middleware.JWTAuth(), middleware.SuperAdminOnly())
+	// 防雷：中间件的挂载顺序绝对不能反！
+	// 必须先经过 JWTAuth 解析出身份并塞入 Context，接着才能让 SuperAdminOnly 去 Context 里查 Role！
+	admin.Use(middleware.JWTAuth(), middleware.SuperAdminOnly())
 	{
-		// 严苛预留：超管的管控接口
-		// admin.DELETE("/users/:id", api.AdminDeleteUser)
-		// admin.DELETE("/rooms/:id", api.AdminDeleteRoom)
+		// 依赖注入 (Dependency Injection)：
+		// 将 hub 指针传入闭包，让 HTTP 协程能够跨界操控底层的 WebSocket 引擎进行“物理击杀”和“系统广播”
+		admin.DELETE("/users/:id", api.AdminDeleteUser(hub))
+		admin.DELETE("/rooms/:id", api.AdminDeleteRoom(hub))
+
 	}
 
 	// ========================================================================
