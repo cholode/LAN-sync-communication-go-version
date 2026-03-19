@@ -5,7 +5,7 @@ import (
 	"net/http"
 
 	"encoding/json"
-	"github.com/bwmarrin/snowflake"
+
 	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
 	"lan-im-go/core"
@@ -118,14 +118,12 @@ func WsEndpoint(hub *core.Hub) gin.HandlerFunc {
 				continue
 			}
 
-			node, _ := snowflake.NewNode(1)
-			msgID := node.Generate().Int64()
 			// 2. 组装标准消息结构体
 			// ⚡ 绝命红线 1 (零信任原则)：
 			// 发送者 ID 绝对、绝对、绝对不能从前端的 JSON 里取！
 			// 必须用我们刚刚在 JWT 中间件里解出来的 realUserID，彻底杜绝越权伪造身份！
 			msg := &models.Message{
-				ID:       msgID,
+				//ID:       msgID,
 				RoomID:   payload.RoomID,
 				SenderID: realUserID,
 				Content:  payload.Content,
@@ -136,15 +134,6 @@ func WsEndpoint(hub *core.Hub) gin.HandlerFunc {
 			// 绝对不能在这里同步调用 db.Create(&msg)！
 			// 如果数据库 I/O 发生哪怕 50 毫秒的抖动，整个 WebSocket 的读循环就会卡死，导致消息积压。
 			// 必须开辟新的协程异步落盘（大厂甚至会在这里把消息丢进 Kafka）
-			go func(m *models.Message) {
-				// 直接接收接口返回的 error！绝不能带 .Error！
-				if err := repository.Message.SaveMessage(m); err != nil {
-					log.Printf("[持久化致命错误] 消息落盘失败, RoomID: %d, SenderID: %d, Err: %v", m.RoomID, m.SenderID, err)
-					// 注意：这里是异步协程，千万不要在这里 c.JSON() 或 return，没有意义
-				} else {
-					log.Printf("[持久化成功] 消息已安全落入物理硬盘 (MsgID: %d)", m.ID)
-				}
-			}(msg)
 
 			// ⚡ 绝命红线 3 (内存级广播转发)：
 			// 将消息丢进 Hub 的全局广播通道。

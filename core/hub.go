@@ -2,9 +2,10 @@ package core
 
 import (
 	"encoding/json"
-	"log"
-
+	"github.com/bwmarrin/snowflake"
 	"lan-im-go/models"
+	"lan-im-go/repository"
+	"log"
 )
 
 // Hub 内存级路由引擎
@@ -65,13 +66,18 @@ func (h *Hub) Run() {
 
 		case msg := <-h.Broadcast:
 			// 1. 无阻塞投递落盘缓冲
+			node, _ := snowflake.NewNode(1)
+			msgID := node.Generate().Int64()
+			msg.ID = msgID
 			select {
 			case h.DBBuffer <- msg:
+
+				//log.Printf("雪花id是-------------%d \n", msgID)
 			default:
 				log.Println("[Hub 致命警告] DBBuffer 已满！触发写保护丢包机制！")
 			}
 
-			// 2. 集中序列化 (千万别放进下面的 for 循环里)
+			//2. 集中序列化 (千万别放进下面的 for 循环里)
 			payload, err := json.Marshal(msg)
 			if err != nil {
 				continue
@@ -107,7 +113,15 @@ func (h *Hub) Run() {
 
 func (h *Hub) asyncDBWriter() {
 	for msg := range h.DBBuffer {
-		// 注意这里改成了 msg.ID，因为在 models.Message 中我们使用的是 ID 而不是 MsgID
+		go func(m *models.Message) {
+			// 直接接收接口返回的 error！绝不能带 .Error！
+			if err := repository.Message.SaveMessage(m); err != nil {
+				log.Printf("[持久化致命错误] 消息落盘失败, RoomID: %d, SenderID: %d, Err: %v", m.RoomID, m.SenderID, err)
+				// 注意：这里是异步协程，千万不要在这里 c.JSON() 或 return，没有意义
+			} else {
+				log.Printf("[持久化成功] 消息已安全落入物理硬盘 (MsgID: %d)", m.ID)
+			}
+		}(msg)
 		log.Printf("[DB Writer] 正在异步落盘 RoomID:%d 的消息 MsgID:%d", msg.RoomID, msg.ID)
 		// 严苛规范：在这里不要直接调 gorm.DB，要通过 repository 接口去落盘
 		// repository.Message.SaveMessage(msg)
