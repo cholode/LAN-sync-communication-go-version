@@ -26,7 +26,17 @@ func (r *roomMemberRepoImpl) AddMember(roomID, userID int64, role int8) error {
 
 func (r *roomMemberRepoImpl) RemoveMember(roomID, userID int64) error {
 	// 物理删除关系表中的记录 (关系解绑不需要软删)
-	return r.db.Where("room_id = ? AND user_id = ?", roomID, userID).Delete(&models.RoomMember{}).Error
+	result := r.db.Where("room_id = ? AND user_id = ?", roomID, userID).Delete(&models.RoomMember{})
+
+	if result.Error != nil {
+		return result.Error
+	}
+
+	if result.RowsAffected == 0 {
+		return gorm.ErrRecordNotFound
+	}
+
+	return nil
 }
 
 // GetUserRoomIDs Hub 引擎的生命线，要求极致的响应速度

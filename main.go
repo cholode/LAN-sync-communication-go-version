@@ -90,10 +90,14 @@ func main() {
 		})
 
 		// 断点续传与文件流转体系
-		authorized.GET("/upload/status", api.CheckUploadStatus)    // 战损探针
-		authorized.POST("/upload/chunk", api.UploadChunk)          // 分片上传
-		authorized.POST("/upload/merge", api.MergeChunks)          // 物理合并
-		authorized.GET("/room/:id/messages", api.GetChatHistory()) //历史记录拉取
+		authorized.GET("/upload/status", api.CheckUploadStatus)     // 战损探针
+		authorized.POST("/upload/chunk", api.UploadChunk)           // 分片上传
+		authorized.POST("/upload/merge", api.MergeChunks)           // 物理合并
+		authorized.GET("/rooms/:id/messages", api.GetChatHistory()) //历史记录拉取
+		authorized.POST("/rooms/:id/join", api.JoinRoom(hub))
+		authorized.GET("/rooms/:id/members", api.GetRoomMembers())
+		authorized.DELETE("/rooms/:id/members/:user_id", api.RemoveRoomMember(hub))
+
 		// 极速零拷贝下载 (注意：实际业务中下载可能不需要鉴权以方便分享，视产品需求而定。严苛起见，我们这里放在鉴权区)
 		authorized.GET("/download/:filename", api.DownloadFile)
 	}

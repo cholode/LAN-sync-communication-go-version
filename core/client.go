@@ -51,6 +51,7 @@ func (c *Client) ReadPump() {
 
 	for {
 		_, message, err := c.Conn.ReadMessage()
+		log.Printf("前端发来了%s\n", message)
 		if err != nil {
 			if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure) {
 				log.Printf("[ReadPump 异常] 用户 %d 连接异常断开: %v", c.UserID, err)
@@ -59,15 +60,23 @@ func (c *Client) ReadPump() {
 		}
 
 		// 解析前端发来的业务 JSON
+		var payload struct {
+			RoomID  int64  `json:"room_id"`
+			Content string `json:"content"`
+		}
 		var msg models.Message
-		if err := json.Unmarshal(message, &msg); err != nil {
+		if err := json.Unmarshal(message, &payload); err != nil {
 			log.Printf("[防爆破] 用户 %d 发送了非法的 JSON 载荷", c.UserID)
 			continue
 		}
-
+		//log.Printf("从这里转发%d\n", msg.RoomID)
 		// 零信任安全：绝对不能相信前端传过来的 SenderID！
 		// 必须在后端用 JWT 鉴权通过后的 Client.UserID 强行覆盖，防止冒名顶替！
 		msg.SenderID = c.UserID
+		msg.Content = payload.Content
+		msg.CreatedAt = time.Now()
+		msg.Type = 1
+		msg.RoomID = payload.RoomID
 
 		// 压入 Hub 进行并发路由
 		c.Hub.Broadcast <- &msg

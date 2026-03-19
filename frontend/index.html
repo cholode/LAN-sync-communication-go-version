@@ -1,153 +1,289 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
-<meta charset="UTF-8">
-<title>LAN-IM 架构师终极测试台</title>
-<style>body{font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;background:#1e1e1e;color:#fff;margin:0;padding:20px;display:flex;gap:20px}.panel{background:#2d2d2d;padding:20px;border-radius:8px;box-shadow:0 4px 6px rgba(0,0,0,0.3);flex:1}input,button{padding:10px;margin:5px 0;border:none;border-radius:4px;width:100%;box-sizing:border-box}input{background:#3d3d3d;color:#fff}button{background:#007acc;color:#fff;cursor:pointer;font-weight:bold}button:hover{background:#005999}#chat-box{height:300px;background:#1e1e1e;border:1px solid #444;overflow-y:auto;padding:10px;margin-bottom:10px;font-family:monospace}.log-sys{color:#f39c12}.log-msg{color:#2ecc71}.log-err{color:#e74c3c}#progress-bar{height:20px;background:#007acc;width:0%;transition:width 0.2s;border-radius:10px}.progress-bg{background:#3d3d3d;border-radius:10px;margin-top:10px;overflow:hidden}</style>
+  <meta charset="UTF-8">
+  <title>LAN-IM 架构师终极测试台 (全双工 + 双轨制)</title>
+  <style>
+    body{font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;background:#1e1e1e;color:#fff;margin:0;padding:20px;display:flex;flex-wrap:wrap;gap:20px}
+    .panel{background:#2d2d2d;padding:20px;border-radius:8px;box-shadow:0 4px 6px rgba(0,0,0,0.3);flex:1;min-width:400px;max-width:48%;}
+    input,button{padding:10px;margin:5px 0;border:none;border-radius:4px;width:100%;box-sizing:border-box}
+    input{background:#3d3d3d;color:#fff;border: 1px solid #555;}
+    button{background:#007acc;color:#fff;cursor:pointer;font-weight:bold;transition: background 0.2s;}
+    button:hover{background:#005999}
+    #chat-box{height:300px;background:#000;border:1px solid #444;overflow-y:auto;padding:10px;margin-bottom:10px;font-family:Consolas, monospace;}
+    .log-sys{color:#ce9178;}
+    .log-msg{color:#4fc1ff;}
+    .log-err{color:#f44336;}
+    .log-hist{color:#b5cea8;}
+    #progress-bar{height:20px;background:#8e44ad;width:0%;transition:width 0.2s;border-radius:10px}
+    .progress-bg{background:#3d3d3d;border-radius:10px;margin-top:10px;overflow:hidden}
+    .flex-row {display: flex; gap: 10px; align-items: center;}
+  </style>
 </head>
 <body>
-<div class="panel">
-  <h3>🔐 第一防线：JWT 身份鉴权</h3>
-  <input type="text" id="username" placeholder="输入用户名 (如: admin)" value="admin">
-  <input type="password" id="password" placeholder="输入密码 (如: 123456)" value="123456">
-  <div style="display: flex; gap: 10px;">
-    <button onclick="register()">1. 注册账号</button>
-    <button onclick="login()">2. 登录并获取 Token</button>
+  <div class="panel">
+    <h3>🔐 第一防线：JWT 身份鉴权</h3>
+    <div class="flex-row">
+      <input type="text" id="username" placeholder="用户名 (如: admin)" value="admin">
+      <input type="password" id="password" placeholder="密码 (如: 123456)" value="123456">
+    </div>
+    <div class="flex-row">
+      <button onclick="register()">1. 注册落盘</button>
+      <button onclick="login()" style="background: #d35400;">2. 签发 Token</button>
+    </div>
+    <p id="token-display" style="word-break: break-all; color: #888; font-size: 12px;">当前状态：未挂载防弹衣</p>
+    <hr style="border-color: #444; margin: 20px 0;">
+    <h3>🚀 第二引擎：全双工频段 & 历史溯源</h3>
+    <div class="flex-row">
+      <button onclick="connectWS()" style="background: #27ae60;">3. 建立 WebSocket 长连接</button>
+    </div>
+    <div id="chat-box">
+      <div class="log-sys">等待系统指令...</div>
+    </div>
+    <div class="flex-row">
+      <input type="number" id="room-id" placeholder="群聊 RoomID" value="1" style="width: 30%;">
+      <input type="text" id="msg-content" placeholder="输入高频消息文本..." style="width: 70%;">
+    </div>
+    <div class="flex-row">
+      <button onclick="sendMsg()">发射消息 (Pub/Sub 广播)</button>
+      <button onclick="fetchHistory()" style="background: #2980b9; width: 60%;">📜 拉取历史记录</button>
+    </div>
   </div>
-  <p id="token-display" style="word-break: break-all; color: #888; font-size: 12px;"></p>
-  <h3>🚀 第二引擎：WebSocket 路由分发</h3>
-  <button onclick="connectWS()" style="background: #27ae60;">3. 携带 Token 建立长连接</button>
-  <div id="chat-box"></div>
-  <input type="text" id="msg-content" placeholder="输入消息内容...">
-  <input type="number" id="room-id" placeholder="目标群聊 ID (如: 1)" value="1">
-  <button onclick="sendMsg()">发射消息 (Pub/Sub 广播)</button>
-</div>
-<div class="panel">
-  <h3>📦 第三矩阵：50MB 大文件极速切片上传</h3>
-  <p style="font-size: 14px; color: #aaa;">请选择一个视频或压缩包进行极限压测：</p>
-  <input type="file" id="file-input">
-  <button onclick="startUpload()" style="background: #8e44ad;">执行分片上传与物理合并</button>
-  <p id="upload-status" style="margin-top: 15px;">等待上传...</p>
-  <div class="progress-bg"><div id="progress-bar"></div></div>
-</div>
-<script>
-const API_BASE = "http://127.0.0.1:8080/api/v1";
-const WS_BASE = "ws://127.0.0.1:8080/api/v1/ws";
-let jwtToken = "";
-let ws = null;
-function logToChat(msg, type) {
-  const box = document.getElementById("chat-box");
-  box.innerHTML += `<div class="${type}">[${new Date().toLocaleTimeString()}] ${msg}</div>`;
-  box.scrollTop = box.scrollHeight;
-}
-async function register() {
-  const u = document.getElementById("username").value;
-  const p = document.getElementById("password").value;
-  try {
-    const res = await fetch(`${API_BASE}/register`, {
-      method: 'POST',
-      headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({username: u, password: p})
-    });
-    const data = await res.json();
-    alert(res.ok ? "注册成功，请点击登录！" : "注册失败: " + data.error);
-  } catch (e) {
-    alert("网络请求失败");
-  }
-}
-async function login() {
-  const u = document.getElementById("username").value;
-  const p = document.getElementById("password").value;
-  try {
-    const res = await fetch(`${API_BASE}/login`, {
-      method: 'POST',
-      headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({username: u, password: p})
-    });
-    const data = await res.json();
-    if (res.ok) {
-      jwtToken = data.token;
-      document.getElementById("token-display").innerText = "当前凭证: " + jwtToken.substring(0, 30) + "...";
-      logToChat("拿到防弹衣 (JWT)！准备建立长连接。", "log-sys");
-    } else {
-      alert("登录失败: " + data.error);
+
+  <div class="panel">
+    <h3>🛡️ 第三矩阵：群聊拓扑与权限仲裁</h3>
+    <p style="font-size: 13px; color: #aaa;">指令下达后，后端 Hub 将在纳秒级完成内存路由树的热更新：</p>
+    <div class="flex-row">
+      <input type="number" id="topo-room-id" placeholder="目标 RoomID (必填)" style="width: 50%;">
+      <input type="number" id="topo-user-id" placeholder="被踢者 UserID (加群/看名单不填)" style="width: 50%;">
+    </div>
+    <div class="flex-row" style="margin-top: 10px;">
+      <button onclick="joinRoom()" style="background: #16a085;">➕ 申请加群</button>
+      <button onclick="getRoomMembers()" style="background: #8e44ad;">📋 查看花名册</button>
+    </div>
+    <div class="flex-row">
+      <button onclick="removeMember()" style="background: #c0392b;">🔪 驱逐成员/退群/解散</button>
+    </div>
+    <p style="font-size: 12px; color: #888;">* 提示：退群请输入你自己的 UID；解散/踢人需超管或群主权限。</p>
+    <hr style="border-color: #444; margin: 20px 0;">
+    <h3>📦 第四矩阵：大文件极速切片流转</h3>
+    <input type="file" id="file-input">
+    <button onclick="startUpload()" style="background: #d35400;">执行分片上传与物理合并</button>
+    <p id="upload-status" style="margin-top: 15px;">等待挂载载荷...</p>
+    <div class="progress-bg"><div id="progress-bar"></div></div>
+  </div>
+
+  <script>
+    const API_BASE = "http://127.0.0.1:8080/api/v1";
+    const WS_BASE = "ws://127.0.0.1:8080/api/v1/ws";
+    let jwtToken = "";
+    let ws = null;
+
+    function logToChat(msg, type) {
+      const box = document.getElementById("chat-box");
+      box.innerHTML += `<div class="${type}">[${new Date().toLocaleTimeString()}] ${msg}</div>`;
+      box.scrollTop = box.scrollHeight;
     }
-  } catch (e) {
-    alert("网络请求失败");
-  }
-}
-function connectWS() {
-  if (!jwtToken) return alert("请先登录获取 Token！");
-  if (ws) ws.close();
-  ws = new WebSocket(`${WS_BASE}?token=${jwtToken}`);
-  ws.onopen = () => logToChat("成功穿透后端防火墙，已接入 Hub 引擎！", "log-sys");
-  ws.onclose = (e) => logToChat(`物理连接已断开 (Code: ${e.code})`, "log-err");
-  ws.onerror = () => logToChat("WebSocket 发生底层异常！", "log-err");
-  ws.onmessage = (e) => {
-    const msg = JSON.parse(e.data);
-    logToChat(`收到 Room[${msg.room_id}] 消息 (Sender:${msg.sender_id}): ${msg.content}`, "log-msg");
-  };
-}
-function sendMsg() {
-  if (!ws || ws.readyState !== WebSocket.OPEN) return alert("WebSocket 未连接！");
-  const content = document.getElementById("msg-content").value;
-  const room_id = parseInt(document.getElementById("room-id").value);
-  const payload = { room_id: room_id, content: content };
-  ws.send(JSON.stringify(payload));
-  logToChat(`已向 Room[${room_id}] 发射载荷`, "log-sys");
-  document.getElementById("msg-content").value = "";
-}
-async function startUpload() {
-  if (!jwtToken) return alert("请先登录获取 Token！");
-  const fileInput = document.getElementById('file-input');
-  if (fileInput.files.length === 0) return alert("请选择一个文件！");
-  const file = fileInput.files[0];
-  const chunkSize = 1 * 1024 * 1024;
-  const totalChunks = Math.ceil(file.size / chunkSize);
-  const fileHash = "mock_hash_" + file.name + "_" + file.size;
-  document.getElementById('upload-status').innerText = `文件大小: ${(file.size/1024/1024).toFixed(2)}MB, 共分 ${totalChunks} 块进行网络流转...`;
-  for (let i = 0; i < totalChunks; i++) {
-    const start = i * chunkSize;
-    const end = Math.min(start + chunkSize, file.size);
-    const chunk = file.slice(start, end);
-    const formData = new FormData();
-    formData.append('chunk', chunk);
-    formData.append('hash', fileHash);
-    formData.append('chunk_index', i);
-    try {
-      const res = await fetch(`${API_BASE}/upload/chunk`, {
+
+    // ============== 身份鉴权模块 ==============
+    async function register() {
+      const u = document.getElementById("username").value;
+      const p = document.getElementById("password").value;
+      try {
+        const res = await fetch(`${API_BASE}/register`, {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({username: u, password: p})
+        });
+        const data = await res.json();
+        alert(res.ok ? "✅ 物理落盘成功，请点击登录！" : "❌ 注册失败: " + data.error);
+      } catch (e) {
+        alert("网络请求失败");
+      }
+    }
+
+    async function login() {
+      const u = document.getElementById("username").value;
+      const p = document.getElementById("password").value;
+      try {
+        const res = await fetch(`${API_BASE}/login`, {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({username: u, password: p})
+        });
+        const data = await res.json();
+        if (res.ok) {
+          jwtToken = data.token;
+          document.getElementById("token-display").innerText = "当前防弹衣: " + jwtToken.substring(0, 30) + "...";
+          logToChat("🔐 鉴权通过，已获取 JWT Token。", "log-sys");
+        } else alert("登录失败: " + data.error);
+      } catch (e) {
+        alert("网络请求失败");
+      }
+    }
+
+    // ============== 全双工通信模块 ==============
+    function connectWS() {
+      if (!jwtToken) return alert("严苛红线：请先登录获取 Token！");
+      if (ws) ws.close();
+      ws = new WebSocket(`${WS_BASE}?token=${jwtToken}`);
+      ws.onopen = () => logToChat("✅ 成功穿透后端防火墙，接管 Hub 广播通道！", "log-sys");
+      ws.onclose = (e) => logToChat(`⚠️ 物理连接被引擎剔除 (状态码: ${e.code})`, "log-err");
+      ws.onerror = () => logToChat("❌ WebSocket 底层 Socket 发生崩溃！", "log-err");
+      ws.onmessage = (e) => {
+        const messages = e.data.split('\n');
+        for (let i = 0; i < messages.length; i++) {
+          const rawText = messages[i].trim();
+          if (!rawText) continue;
+          try {
+            const msg = JSON.parse(rawText);
+            const sender = msg.sender_id || msg.SenderID || "未知";
+            const room = msg.room_id || msg.RoomID || "全局";
+            const content = msg.content || msg.Content || "[空]";
+            logToChat(`🔽 [频段 ${room}] 收到 UID(${sender}) 实时广播: ${content}`, "log-msg");
+          } catch (err) {
+            logToChat(`❌ 收到无法解析的畸形数据帧`, "log-err");
+          }
+        }
+      };
+    }
+
+    function sendMsg() {
+      if (!ws || ws.readyState !== WebSocket.OPEN) return alert("通道未就绪，无法发射！");
+      const content = document.getElementById("msg-content").value;
+      if (!content) return;
+      const RoomID = parseInt(document.getElementById("room-id").value) || 1;
+      const payload = { room_id: RoomID, content: content };
+      ws.send(JSON.stringify(payload));
+      logToChat(`🔼 已向频段 [${RoomID}] 发射上行载荷: ${content}`, "log-sys");
+      document.getElementById("msg-content").value = "";
+    }
+
+    async function fetchHistory() {
+      if (!jwtToken) return alert("必须携带 Token 才能访问历史档案！");
+      const RoomID = parseInt(document.getElementById("room-id").value);
+      if (!RoomID) return alert("必须指定要拉取的群聊 RoomID！");
+      try {
+        const res = await fetch(`${API_BASE}/rooms/${RoomID}/messages`, {
+          headers: { 'Authorization': `Bearer ${jwtToken}` }
+        });
+        const data = await res.json();
+        if (!res.ok) return logToChat(`❌ 拉取失败: ${data.error}`, "log-err");
+        const msgs = data.data || data.messages || data || [];
+        if (!msgs.length) return logToChat(`📭 [Room ${RoomID}] 物理硬盘中暂无更多记录。`, "log-hist");
+        logToChat(`✅ 成功解冻 [Room ${RoomID}] 的 ${msgs.length} 条历史日志：`, "log-sys");
+        msgs.forEach(msg => {
+          const sender = msg.sender_id || msg.SenderID || "?";
+          const content = msg.content || msg.Content || "[空]";
+          logToChat(`📜 [历史] UID(${sender}): ${content}`, "log-hist");
+        });
+      } catch (err) {
+        logToChat(`❌ HTTP 请求发送失败`, "log-err");
+      }
+    }
+
+    // ============== 拓扑与权限仲裁模块 (新增) ==============
+    async function joinRoom() {
+      if (!jwtToken) return alert("严苛红线：防弹衣丢失！");
+      const RoomID = parseInt(document.getElementById("topo-room-id").value);
+      if (!RoomID) return alert("必须输入目标 RoomID！");
+      try {
+        const res = await fetch(`${API_BASE}/rooms/${RoomID}/join`, {
+          method: 'POST',
+          headers: { 'Authorization': `Bearer ${jwtToken}` }
+        });
+        const data = await res.json();
+        if (res.ok) logToChat(`🛡️ 拓扑操作成功：${data.message} (Room ${RoomID})`, "log-sys");
+        else logToChat(`❌ 加群受阻：${data.error}`, "log-err");
+      } catch (e) {
+        logToChat("❌ 拓扑请求异常", "log-err");
+      }
+    }
+
+    async function getRoomMembers() {
+      if (!jwtToken) return alert("严苛红线：防弹衣丢失！");
+      const RoomID = parseInt(document.getElementById("topo-room-id").value);
+      if (!RoomID) return alert("必须输入目标 RoomID！");
+      try {
+        const res = await fetch(`${API_BASE}/rooms/${RoomID}/members`, {
+          method: 'GET',
+          headers: { 'Authorization': `Bearer ${jwtToken}` }
+        });
+        const data = await res.json();
+        if (res.ok) {
+          logToChat(`📋 [Room ${RoomID}] 成员名单拉取成功：`, "log-sys");
+          data.members.forEach(m => logToChat(` - UID: ${m.user_id} | Name: ${m.username}`, "log-sys"));
+        } else logToChat(`❌ 越权探测被拦截：${data.error}`, "log-err");
+      } catch (e) {
+        logToChat("❌ 拓扑请求异常", "log-err");
+      }
+    }
+
+    async function removeMember() {
+      if (!jwtToken) return alert("严苛红线：防弹衣丢失！");
+      const RoomID = parseInt(document.getElementById("topo-room-id").value);
+      const TargetUID = parseInt(document.getElementById("topo-user-id").value);
+      if (!RoomID || !TargetUID) return alert("必须输入 RoomID 和 被踢者 UserID！");
+      try {
+        const res = await fetch(`${API_BASE}/rooms/${RoomID}/members/${TargetUID}`, {
+          method: 'DELETE',
+          headers: { 'Authorization': `Bearer ${jwtToken}` }
+        });
+        const data = await res.json();
+        if (res.ok) logToChat(`🔪 执行指令成功：${data.message}`, "log-err");
+        else logToChat(`❌ 仲裁庭驳回：${data.error}`, "log-err");
+      } catch (e) {
+        logToChat("❌ 拓扑请求异常", "log-err");
+      }
+    }
+
+    // ============== 大文件极速切片模块 ==============
+    async function startUpload() {
+      if (!jwtToken) return alert("请先登录！");
+      const fileInput = document.getElementById('file-input');
+      if (!fileInput.files.length) return alert("请选择文件！");
+      const file = fileInput.files[0];
+      const chunkSize = 1 * 1024 * 1024;
+      const totalChunks = Math.ceil(file.size / chunkSize);
+      const fileHash = "mock_hash_" + file.name + "_" + file.size;
+      document.getElementById('upload-status').innerText = `准备流转 ${(file.size/1024/1024).toFixed(2)}MB...`;
+
+      for (let i = 0; i < totalChunks; i++) {
+        const chunk = file.slice(i * chunkSize, Math.min((i + 1) * chunkSize, file.size));
+        const formData = new FormData();
+        formData.append('chunk', chunk);
+        formData.append('hash', fileHash);
+        formData.append('chunk_index', i);
+        try {
+          const res = await fetch(`${API_BASE}/upload/chunk`, {
+            method: 'POST',
+            headers: {'Authorization': `Bearer ${jwtToken}`},
+            body: formData
+          });
+          if (!res.ok) throw new Error("分片阻断");
+          const percent = Math.round(((i + 1) / totalChunks) * 100);
+          document.getElementById('progress-bar').style.width = percent + '%';
+          document.getElementById('upload-status').innerText = `物理输送中: ${percent}%`;
+        } catch (err) {
+          return alert("传输中断！");
+        }
+      }
+
+      const mergeData = new FormData();
+      mergeData.append('hash', fileHash);
+      mergeData.append('filename', file.name);
+      mergeData.append('total_chunks', totalChunks);
+      const mergeRes = await fetch(`${API_BASE}/upload/merge`, {
         method: 'POST',
         headers: {'Authorization': `Bearer ${jwtToken}`},
-        body: formData
+        body: mergeData
       });
-      if (!res.ok) throw new Error("分片落盘失败");
-      const percent = Math.round(((i + 1) / totalChunks) * 100);
-      document.getElementById('progress-bar').style.width = percent + '%';
-      document.getElementById('upload-status').innerText = `上传中... 进度: ${percent}% (切片 ${i+1}/${totalChunks})`;
-    } catch (err) {
-      return alert("网络异常，上传中断！下次点击将触发断点续传。");
+      const mergeResult = await mergeRes.json();
+      if (mergeRes.ok) {
+        document.getElementById('upload-status').innerText = `✅ 合并成功！${mergeResult.download_url}`;
+        if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ room_id: 1, content: `[超载荷文件] ${mergeResult.download_url}` }));
+      } else document.getElementById('upload-status').innerText = `❌ 合并失败: ${mergeResult.error}`;
     }
-  }
-  document.getElementById('upload-status').innerText = `切片已全部送达，正在呼叫后端磁盘 I/O 执行物理合并...`;
-  const mergeData = new FormData();
-  mergeData.append('hash', fileHash);
-  mergeData.append('filename', file.name);
-  mergeData.append('total_chunks', totalChunks);
-  const mergeRes = await fetch(`${API_BASE}/upload/merge`, {
-    method: 'POST',
-    headers: {'Authorization': `Bearer ${jwtToken}`},
-    body: mergeData
-  });
-  const mergeResult = await mergeRes.json();
-  if (mergeRes.ok) {
-    document.getElementById('upload-status').innerText = `✅ 物理合并成功！下载链接: ${mergeResult.download_url}`;
-    if (ws && ws.readyState === WebSocket.OPEN) {
-      ws.send(JSON.stringify({ room_id: 1, content: `[文件] 我上传了一个极速文件: ${mergeResult.download_url}` }));
-    }
-  } else {
-    document.getElementById('upload-status').innerText = `❌ 合并失败: ` + mergeResult.error;
-  }
-}
-</script>
+  </script>
 </body>
 </html>

@@ -8,6 +8,12 @@ import (
 	"log"
 )
 
+type RoomAction struct {
+	UserID int64
+	RoomID int64
+	Action string
+}
+
 // Hub 内存级路由引擎
 type Hub struct {
 	// 【核心双索引架构】：空间换时间
@@ -16,22 +22,24 @@ type Hub struct {
 	// 2. 控制面狙击索引：UserID -> Client
 	users map[int64]*Client
 	// 调度管道 (全部复用 models.Message，实现全栈数据模型统一)
-	Subscribe   chan *Subscription
-	Unsubscribe chan *Subscription
-	Broadcast   chan *models.Message
-	DBBuffer    chan *models.Message
-	Kick        chan int64
+	Subscribe      chan *Subscription
+	Unsubscribe    chan *Subscription
+	Broadcast      chan *models.Message
+	DBBuffer       chan *models.Message
+	RoomActionChan chan *RoomAction
+	Kick           chan int64
 }
 
 func NewHub() *Hub {
 	return &Hub{
-		rooms:       make(map[int64]map[*Client]bool), //房间里有哪些人
-		users:       make(map[int64]*Client),          //
-		Subscribe:   make(chan *Subscription),
-		Unsubscribe: make(chan *Subscription),
-		Broadcast:   make(chan *models.Message, 1024), // 抵御突发消息洪峰
-		DBBuffer:    make(chan *models.Message, 5000), // 异步落盘的高速缓冲
-		Kick:        make(chan int64),
+		rooms:          make(map[int64]map[*Client]bool), //房间里有哪些人
+		users:          make(map[int64]*Client),          //
+		Subscribe:      make(chan *Subscription),
+		Unsubscribe:    make(chan *Subscription),
+		Broadcast:      make(chan *models.Message, 1024), // 抵御突发消息洪峰
+		DBBuffer:       make(chan *models.Message, 5000), // 异步落盘的高速缓冲
+		RoomActionChan: make(chan *RoomAction, 100),
+		Kick:           make(chan int64),
 	}
 }
 
@@ -100,6 +108,40 @@ func (h *Hub) Run() {
 						client.Conn.Close()
 					}
 				}
+			}
+
+		case action := <-h.RoomActionChan:
+			// ⚡ 核心防线：必须根据 HTTP 接口透传过来的 Action 指令，执行对应的内存拓扑修改！
+			switch action.Action {
+			case "join":
+				if client, ok := h.users[action.UserID]; ok {
+					if h.rooms[action.RoomID] == nil {
+						h.rooms[action.RoomID] = make(map[*Client]bool)
+					}
+					h.rooms[action.RoomID][client] = true
+					log.Printf("[Hub 引擎] 内存路由热更新：UID:%d 动态接入 Room:%d", action.UserID, action.RoomID)
+				} else {
+					log.Printf("[Hub 引擎] UID:%d 当前离线，无需热挂载路由", action.UserID)
+				}
+			case "leave":
+				// 🔪 单兵剥离：踢人或退群
+				if client, ok := h.users[action.UserID]; ok {
+					if h.rooms[action.RoomID] != nil {
+						// 从该群的活跃订阅字典中，精准删除这个 client 指针
+						delete(h.rooms[action.RoomID], client)
+						log.Printf("[Hub 引擎] 路由已斩断：UID:%d 被物理剥离 Room:%d", action.UserID, action.RoomID)
+						// 可选：你甚至可以直接通过 client.Send 给他发一条系统消息："你已被移出群聊"
+					}
+				}
+			case "disband":
+				// 💥 级联毁灭：群主解散群聊
+				if h.rooms[action.RoomID] != nil {
+					// 架构师的干净利落：直接把整个群的 map 从内存中连根拔起，交给 Go GC (垃圾回收) 处理！
+					delete(h.rooms, action.RoomID)
+					log.Printf("[Hub 引擎] 频段覆灭：Room:%d 的内存路由树已被彻底摧毁！", action.RoomID)
+				}
+			default:
+				log.Printf("[Hub 引擎 致命警告] 收到未知的内存操纵指令: %s", action.Action)
 			}
 
 		case targetUserID := <-h.Kick:

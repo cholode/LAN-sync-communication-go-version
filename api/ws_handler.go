@@ -1,16 +1,16 @@
 package api
 
 import (
-	"log"
-	"net/http"
-
 	"encoding/json"
-
 	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
 	"lan-im-go/core"
 	"lan-im-go/models"
 	"lan-im-go/repository"
+	"log"
+	"net/http"
+	"time"
+	//"time"
 )
 
 // 全局 WebSocket 协议升级器
@@ -90,8 +90,10 @@ func WsEndpoint(hub *core.Hub) gin.HandlerFunc {
 		// 注册进 Hub：hub.Subscribe <- sub
 		// ==========================================================
 		// 架构师的防御编程：当死循环被打破（客户端断开）时，必须清理内存，防止 Goroutine 泄露！
-		go client.WritePump()
+		// 告诉系统：多久没收到心跳就踢人 (比如 60 秒)
+
 		go client.ReadPump()
+		go client.WritePump()
 
 		defer func() {
 			// 注销该用户的路由节点 (假设你的 hub 有注销通道)
@@ -124,9 +126,11 @@ func WsEndpoint(hub *core.Hub) gin.HandlerFunc {
 			// 必须用我们刚刚在 JWT 中间件里解出来的 realUserID，彻底杜绝越权伪造身份！
 			msg := &models.Message{
 				//ID:       msgID,
-				RoomID:   payload.RoomID,
-				SenderID: realUserID,
-				Content:  payload.Content,
+				RoomID:    payload.RoomID,
+				SenderID:  realUserID,
+				Content:   payload.Content,
+				CreatedAt: time.Now(),
+				Type:      1,
 				// Type 等其他字段视你的表结构而定
 			}
 
