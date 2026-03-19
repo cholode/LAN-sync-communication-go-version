@@ -4,9 +4,12 @@ import (
 	"log"
 	"net/http"
 
+	"encoding/json"
+	"github.com/bwmarrin/snowflake"
 	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
 	"lan-im-go/core"
+	"lan-im-go/models"
 	"lan-im-go/repository"
 )
 
@@ -81,11 +84,79 @@ func WsEndpoint(hub *core.Hub) gin.HandlerFunc {
 		// 将其推入 Hub 的单线程大循环，进行无锁化挂载
 		hub.Subscribe <- subscription
 
+		///--------------------------------------------------------------------
+		// ==========================================================
+		// 前面的代码：升级协议 conn, err := upgrader.Upgrade(...)
+		// 注册进 Hub：hub.Subscribe <- sub
+		// ==========================================================
+		// 架构师的防御编程：当死循环被打破（客户端断开）时，必须清理内存，防止 Goroutine 泄露！
+		go client.WritePump()
+		go client.ReadPump()
+
+		defer func() {
+			// 注销该用户的路由节点 (假设你的 hub 有注销通道)
+			hub.Unsubscribe <- subscription
+			conn.Close()
+			log.Printf("[WebSocket] 用户 %d 的物理连接已彻底释放", realUserID)
+		}()
+
+		// 开启读泵 (Read Pump)：全双工持续监听前端发来的二进制流
+		for {
+			_, rawMsg, err := conn.ReadMessage()
+			if err != nil {
+				// 正常断开或网络异常，跳出死循环，触发 defer 清理
+				break
+			}
+
+			// 1. 解析前端传来的载荷 (对应我们前端测试台发来的 JSON)
+			var payload struct {
+				RoomID  int64  `json:"room_id"`
+				Content string `json:"content"`
+			}
+			if err := json.Unmarshal(rawMsg, &payload); err != nil {
+				log.Printf("[WebSocket 警告] 收到畸形消息: %v", err)
+				continue
+			}
+
+			node, _ := snowflake.NewNode(1)
+			msgID := node.Generate().Int64()
+			// 2. 组装标准消息结构体
+			// ⚡ 绝命红线 1 (零信任原则)：
+			// 发送者 ID 绝对、绝对、绝对不能从前端的 JSON 里取！
+			// 必须用我们刚刚在 JWT 中间件里解出来的 realUserID，彻底杜绝越权伪造身份！
+			msg := &models.Message{
+				ID:       msgID,
+				RoomID:   payload.RoomID,
+				SenderID: realUserID,
+				Content:  payload.Content,
+				// Type 等其他字段视你的表结构而定
+			}
+
+			// ⚡ 绝命红线 2 (异步持久化)：
+			// 绝对不能在这里同步调用 db.Create(&msg)！
+			// 如果数据库 I/O 发生哪怕 50 毫秒的抖动，整个 WebSocket 的读循环就会卡死，导致消息积压。
+			// 必须开辟新的协程异步落盘（大厂甚至会在这里把消息丢进 Kafka）
+			go func(m *models.Message) {
+				// 直接接收接口返回的 error！绝不能带 .Error！
+				if err := repository.Message.SaveMessage(m); err != nil {
+					log.Printf("[持久化致命错误] 消息落盘失败, RoomID: %d, SenderID: %d, Err: %v", m.RoomID, m.SenderID, err)
+					// 注意：这里是异步协程，千万不要在这里 c.JSON() 或 return，没有意义
+				} else {
+					log.Printf("[持久化成功] 消息已安全落入物理硬盘 (MsgID: %d)", m.ID)
+				}
+			}(msg)
+
+			// ⚡ 绝命红线 3 (内存级广播转发)：
+			// 将消息丢进 Hub 的全局广播通道。
+			// Hub 的大循环一旦监听到这个通道有数据，就会瞬间遍历该 RoomID 下所有的活跃连接，并推送到他们的机器上！
+			// 如果你的 Hub 设计了 Broadcast 通道，就在这里调用：
+			hub.Broadcast <- msg
+			log.Printf("[Hub 引擎] 收到来自用户 %d 往房间 %d 发送的载荷，已交由引擎广播", realUserID, payload.RoomID)
+		}
+
 		// ====================================================================
 		// 5. 启动读写分离双泵 (CSP 并发模型起飞)
 		// ====================================================================
 		// 释放 Gin 的 HTTP 主协程，将 TCP 句柄彻底交接给这两个常驻子协程
-		go client.WritePump()
-		go client.ReadPump()
 	}
 }

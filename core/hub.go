@@ -24,8 +24,8 @@ type Hub struct {
 
 func NewHub() *Hub {
 	return &Hub{
-		rooms:       make(map[int64]map[*Client]bool),
-		users:       make(map[int64]*Client),
+		rooms:       make(map[int64]map[*Client]bool), //房间里有哪些人
+		users:       make(map[int64]*Client),          //
 		Subscribe:   make(chan *Subscription),
 		Unsubscribe: make(chan *Subscription),
 		Broadcast:   make(chan *models.Message, 1024), // 抵御突发消息洪峰
