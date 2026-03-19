@@ -2,8 +2,9 @@ package pkg
 
 import (
 	"errors"
+	//"log"
+	"os"
 	"time"
-	//"os"
 	//"github.com/joho/godotenv"
 	"github.com/golang-jwt/jwt/v5"
 )
@@ -12,9 +13,13 @@ import (
 // 必须通过环境变量 (os.Getenv) 或 KMS 密钥管理系统注入。
 // 这里仅作演示。
 
-//KEY := os.Getenv("JWT_SUPER_SECRET_KEY")
-
-var jwtSecret = []byte("SUPER_SECRET_KEY")
+var jwtSecret = func() []byte {
+	secret := os.Getenv("JWT_SECRET")
+	if secret == "" {
+		return []byte("fK29gArL2zTtX7V8ErD9bF2wR4qJ6pM3")
+	}
+	return []byte(secret)
+}
 
 // CustomClaims 自定义载荷：除了标准的过期时间，我们把核心身份数据也打包进去
 type CustomClaims struct {
@@ -28,6 +33,7 @@ func GenerateToken(userID int64, role int8) (string, error) {
 	claims := CustomClaims{
 		UserID: userID,
 		Role:   role,
+
 		RegisteredClaims: jwt.RegisteredClaims{
 			// 安全策略：Token 必须有极短的有效期（如 24 小时）
 			// 拒绝签发长久有效的 Token，防止泄露后被无限期利用
@@ -36,9 +42,10 @@ func GenerateToken(userID int64, role int8) (string, error) {
 			Issuer:    "lan-im-server",
 		},
 	}
+
 	// 使用 HMAC SHA256 算法进行签名
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-	return token.SignedString(jwtSecret)
+	return token.SignedString(jwtSecret())
 }
 
 // ParseToken 中间件拦截时调用，验明正身
@@ -48,7 +55,7 @@ func ParseToken(tokenString string) (*CustomClaims, error) {
 		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
 			return nil, errors.New("非法的签名算法")
 		}
-		return jwtSecret, nil
+		return jwtSecret(), nil
 	})
 	if err != nil {
 		return nil, err

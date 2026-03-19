@@ -1,59 +1,58 @@
 package middleware
 
 import (
+	"lan-im-go/pkg"
+	"log"
 	"net/http"
 	"strings"
 
 	"github.com/gin-gonic/gin"
-
-	"lan-im-go/pkg"
-	"lan-im-go/repository"
+	// "lan-im-go/pkg" // JWT 解析工具包
 )
 
-// JWTAuth 核心拦截器
 func JWTAuth() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		// 1. 提取 Authorization Header
+		var tokenString string
+		// 1. 尝试从标准 HTTP 的 Authorization Header 中获取
+		log.Printf("[JWT 防线] 收到请求: %s %s", c.Request.Method, c.Request.URL.String())
 		authHeader := c.GetHeader("Authorization")
-		if authHeader == "" {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "缺失 Authorization 请求头"})
-			c.Abort() // 严禁代码继续向后执行
-			return
+		if authHeader != "" {
+			log.Printf("")
+			parts := strings.SplitN(authHeader, " ", 2)
+			if len(parts) == 2 && parts[0] == "Bearer" {
+
+				tokenString = parts[1]
+				log.Printf("token提取成功")
+			} else {
+				c.JSON(http.StatusUnauthorized, gin.H{"error": "Header 中的 Token 格式错误"})
+				c.Abort()
+				return
+			}
+		} else {
+
+			// 2. 尝试从 URL Query 参数中获取 (专为 WebSocket 握手开启的绿色通道！)
+			tokenString = c.Query("token")
+			log.Printf("成功从query提取token")
 		}
 
-		// 2. 严苛校验 Bearer 格式
-		// 标准格式为 "Bearer eyJhbGciOiJIUzI1NiIs..."
-		parts := strings.SplitN(authHeader, " ", 2)
-		if !(len(parts) == 2 && parts[0] == "Bearer") {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "Token 格式错误，必须为 Bearer 类型"})
+		// 3. 终极判决：如果两个地方都没有，直接击毙
+		if tokenString == "" {
+			log.Printf("token为空")
+
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "拒绝访问：缺失 Token 凭证"})
 			c.Abort()
 			return
 		}
 
-		// 3. 解析底层 Token
-		claims, err := pkg.ParseToken(parts[1])
+		claims, err := pkg.ParseToken(tokenString)
 		if err != nil {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "Token 无效或已过期"})
-			c.Abort()
-			return
+			log.Printf("Token解析错误\n")
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "Token解析错误"})
 		}
 
-		// 4. 防范幽灵 Token
-		// 假如一个用户被超管软删除了，但他手里的 Token 还有 10 小时才过期怎么办？
-		// 必须在这里利用之前写好的 Repository 查一次库，确认该账号是否还合法存活！
-		user, err := repository.User.GetByID(claims.UserID)
-		if err != nil || user == nil {
-			c.JSON(http.StatusForbidden, gin.H{"error": "该账号已被冻结或物理注销"})
-			c.Abort()
-			return
-		}
-
-		// 5. 身份注入上下文
-		// 把清洗干净、绝对可信的身份信息塞进 Gin Context 中
-		// 后续所有的业务 Handler (包括上传接口)，都只能从这里拿 userID，绝对信任！
 		c.Set("user_id", claims.UserID)
-		c.Set("role", claims.Role)
-		c.Next() // 放行，进入业务逻辑
+
+		c.Next()
 	}
 }
 

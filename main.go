@@ -4,12 +4,15 @@ import (
 	"log"
 	"os"
 
-	"github.com/gin-gonic/gin"
 	"lan-im-go/api"
 	"lan-im-go/core"
 	"lan-im-go/infrastructure"
 	"lan-im-go/middleware"
 	"lan-im-go/repository"
+	"time"
+
+	"github.com/gin-contrib/cors"
+	"github.com/gin-gonic/gin"
 )
 
 func main() {
@@ -19,7 +22,7 @@ func main() {
 	// 从环境变量读取 DSN，如果为空则使用本地兜底配置 (应对脱离 Docker 的本地调试)
 	dsn := os.Getenv("DB_DSN")
 	if dsn == "" {
-		dsn = "root:123456@tcp(127.0.0.1:3306)/lan_im?charset=utf8mb4&parseTime=True&loc=Local"
+		dsn = "root:123456@tcp(127.0.0.1:3307)/lan_im?charset=utf8mb4&parseTime=True&loc=Local"
 		log.Println("[警告] 未检测到 DB_DSN 环境变量，正在使用本地默认配置连接 MySQL")
 	}
 
@@ -50,6 +53,23 @@ func main() {
 	// 生产环境中应切换为 gin.SetMode(gin.ReleaseMode)
 	r := gin.Default()
 
+	// ========================================================================
+	// 架构师的 CORS 跨域防线 (必须放在所有路由挂载之前！)
+	// ========================================================================
+	r.Use(cors.New(cors.Config{
+		AllowAllOrigins: true, // 严苛警告：本地开发为了图方便设为 true，生产环境必须写死前端域名！
+		AllowMethods:    []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
+		// 注意这里：必须显式放行 Authorization，否则后面的断点续传切片会因为没带 Token 而被拦截
+		AllowHeaders:     []string{"Origin", "Content-Type", "Authorization"},
+		ExposeHeaders:    []string{"Content-Length"},
+		AllowCredentials: true,
+		MaxAge:           12 * time.Hour, // 预检请求缓存时间，减少 OPTIONS 轰炸
+	}))
+
+	// ========================================================================
+	// Phase 4: API 路由接入层 (HTTP/WS Router)
+	// ========================================================================
+
 	// 【防线 1：公共开放区】 (零信任边缘，任何人可访问)
 	public := r.Group("/api/v1")
 	{
@@ -64,8 +84,9 @@ func main() {
 	authorized.Use(middleware.JWTAuth())
 	{
 		// WebSocket 握手升级大门 (依赖注入了全局唯一 hub)
+		log.Printf("到连接建立部分了\n")
 		authorized.GET("/ws", func(c *gin.Context) {
-			api.WsEndpoint(hub)
+			api.WsEndpoint(hub)(c)
 		})
 
 		// 断点续传与文件流转体系

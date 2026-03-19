@@ -31,8 +31,10 @@ func WsEndpoint(hub *core.Hub) gin.HandlerFunc {
 		// ====================================================================
 		// 由于这个接口被 middleware.JWTAuth() 保护，走到这里时，
 		// 用户的真实身份绝对已经被安全地注入到了 Context 中！
+
 		userID, exists := c.Get("user_id")
 		if !exists {
+			log.Printf("用户不存在\n")
 			c.JSON(http.StatusUnauthorized, gin.H{"error": "系统上下文身份丢失，拒绝握手"})
 			return
 		}
@@ -47,7 +49,7 @@ func WsEndpoint(hub *core.Hub) gin.HandlerFunc {
 			log.Printf("[握手失败] 协议升级异常 UID:%d, Err:%v", realUserID, err)
 			return // Upgrade 失败时底层会自动写入 HTTP 错误响应，不要再 c.JSON 了
 		}
-
+		log.Printf("握手成功\n")
 		// ====================================================================
 		// 3. 构建初始内存路由表 (核心状态同步)
 		// ====================================================================

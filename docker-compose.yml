@@ -17,14 +17,16 @@ services:
     restart: unless-stopped
     # 密码绝不硬编码在 yaml 中，必须通过 .env 文件注入
     environment:
-      MYSQL_ROOT_PASSWORD: ${DB_PASSWORD}
-      MYSQL_DATABASE: ${DB_NAME}
+      MYSQL_ROOT_PASSWORD:  ${DB_PASSWORD}
+      MYSQL_DATABASE:  ${DB_NAME}
     ports:
-      - "3306:3306" # 本地开发需要暴露端口以便用 Navicat/DataGrip 连接
+      - "3307:3306" # 本地开发需要暴露端口以便用 Navicat/DataGrip 连接
+   
+    #command: --default-authentication-plugin=mysql_native_password    #调试
     volumes:
       - mysql_data:/var/lib/mysql
       # 挂载初始化脚本，第一次启动时自动执行（可选，配合 GORM 自动迁移）
-      # - ./deploy/mysql/init.sql:/docker-entrypoint-initdb.d/init.sql
+      - ./deploy/mysql/init.sql:/docker-entrypoint-initdb.d/init.sql
     networks:
       - lan-im-network
     # 面试加分项：健康检查。确保 MySQL 真正 Ready 后，再放行依赖它的服务

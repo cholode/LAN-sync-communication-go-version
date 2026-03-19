@@ -1,13 +1,14 @@
 package api
 
 import (
-	"net/http"
-
+	"fmt"
 	"github.com/gin-gonic/gin"
 	"golang.org/x/crypto/bcrypt"
 	"lan-im-go/models"
 	"lan-im-go/pkg"
 	"lan-im-go/repository"
+	"log"
+	"net/http"
 )
 
 type LoginRequest struct {
@@ -43,6 +44,7 @@ func LoginHandler(c *gin.Context) {
 	// 3. 密码正确，签发 JWT 通行证
 	token, err := pkg.GenerateToken(user.ID, user.Role)
 	if err != nil {
+		log.Printf("%s/n", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "系统签发凭证失败"})
 		return
 	}
@@ -69,7 +71,9 @@ type RegisterRequest struct {
 }
 
 func RegisterHandler(c *gin.Context) {
+
 	var req RegisterRequest
+	fmt.Printf(("进来了"))
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "参数格式不合法：账号或密码长度不符合规范"})
 		return
@@ -84,7 +88,7 @@ func RegisterHandler(c *gin.Context) {
 	}
 
 	// 防线 3：密码哈希单向加密 (Bcrypt)
-	// 面试官红线：绝对、永远不允许将明文密码直接写入数据库！
+	// 不允许将明文密码直接写入数据库！
 	// Bcrypt.DefaultCost (通常是 10) 意味着每次加密大概需要 50-100 毫秒
 	// 这个刻意设计的延迟，能让黑客的彩虹表爆破成本呈指数级上升
 	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
