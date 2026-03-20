@@ -8,8 +8,8 @@ import (
 	"path/filepath"
 	"strconv"
 	//"strings"
-
 	"github.com/gin-gonic/gin"
+	"log"
 )
 
 const (
@@ -27,12 +27,17 @@ func InitFileDirs() {
 // 前端在上传任何文件前，必须先调用此接口
 // ============================================================================
 func CheckUploadStatus(c *gin.Context) {
+
+	log.Printf("开始分片校验\n")
+
 	fileHash := c.Query("hash")
 	fileName := c.Query("filename")
 	if fileHash == "" || fileName == "" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "参数缺失"})
 		return
 	}
+
+	log.Printf("分片校验成功\n")
 
 	safeFileName := filepath.Base(fileName)
 	finalFilePath := filepath.Join(UploadBaseDir, fmt.Sprintf("%s_%s", fileHash, safeFileName))
@@ -44,12 +49,16 @@ func CheckUploadStatus(c *gin.Context) {
 			"msg":          "文件已秒传",
 			"download_url": fmt.Sprintf("/api/v1/download/%s_%s", fileHash, safeFileName),
 		})
+
+		log.Printf("文件已传完\n")
 		return
 	}
 
 	// 2. 断点战损扫描：去临时目录清点尸体
 	chunkDirPath := filepath.Join(TempChunkDir, filepath.Clean(fileHash))
 	var uploadedChunks []int
+
+	log.Printf("开始补传准备\n")
 
 	// 读取目录下的所有切片文件
 	entries, err := os.ReadDir(chunkDirPath)
@@ -63,7 +72,7 @@ func CheckUploadStatus(c *gin.Context) {
 			}
 		}
 	}
-
+	log.Printf("将需要补传的发给用户\n")
 	// 3. 将已经存在的切片索引返回给前端，前端拿到后，只需上传缺少的切片
 	c.JSON(http.StatusOK, gin.H{
 		"status":          "uploading",
@@ -185,4 +194,35 @@ func DownloadFile(c *gin.Context) {
 
 	// 触发底层 sendfile 系统调用
 	c.File(filePath)
+}
+
+// ============================================================================
+// 【断点续传：防线收缩 - 取消上传与物理垃圾回收】
+// ============================================================================
+func CancelUpload(c *gin.Context) {
+	// RESTful 规范：使用 DELETE 方法，把 hash 放在路由或者 Query 里
+	fileHash := c.Query("hash")
+	if fileHash == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "缺少核心销毁凭证"})
+		return
+	}
+
+	// 防御目录穿越攻击
+	safeHash := filepath.Clean(fileHash)
+	if safeHash == "." || safeHash == "/" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "非法凭证"})
+		return
+	}
+
+	chunkDirPath := filepath.Join(TempChunkDir, safeHash)
+
+	// OS 级无情抹除：不管里面有多少切片，连锅端
+	if err := os.RemoveAll(chunkDirPath); err != nil {
+		log.Printf("[垃圾回收异常] 无法抹除废弃切片目录: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "物理残骸清理失败"})
+		return
+	}
+
+	log.Printf("[存储引流] 终端主动切断传输，已抹除 Hash: %s 的所有残骸", safeHash)
+	c.JSON(http.StatusOK, gin.H{"msg": "已终止传输并清理了云端缓存"})
 }

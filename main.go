@@ -29,7 +29,7 @@ func main() {
 	// 初始化数据库连接池并执行 AutoMigrate 建表
 	// 如果这里连不上数据库，程序必须直接 panic/fatal 退出，绝对不能带病启动！
 	infrastructure.InitDatabase(dsn)
-
+	api.InitFileDirs()
 	// ========================================================================
 	// Phase 2: 领域层与持久层装配 (Repository Injection)
 	// ========================================================================
@@ -97,9 +97,12 @@ func main() {
 		authorized.POST("/rooms/:id/join", api.JoinRoom(hub))
 		authorized.GET("/rooms/:id/members", api.GetRoomMembers())
 		authorized.DELETE("/rooms/:id/members/:user_id", api.RemoveRoomMember(hub))
-
+		authorized.DELETE("upload/cancel", api.CancelUpload)
 		// 极速零拷贝下载 (注意：实际业务中下载可能不需要鉴权以方便分享，视产品需求而定。严苛起见，我们这里放在鉴权区)
 		authorized.GET("/download/:filename", api.DownloadFile)
+		// 创世与拓扑拉取路由
+		authorized.POST("/rooms", api.CreateRoom(hub)) // RESTful: POST 创建资源
+		authorized.GET("/my_rooms", api.GetMyRooms())  // RESTful: 获取当前登录者加入的群
 	}
 
 	// 【防线 3：B 端超管绝对隔离区】 (最高权限区)

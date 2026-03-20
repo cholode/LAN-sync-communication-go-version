@@ -1,12 +1,13 @@
 package api
 
 import (
-	"net/http"
-	"strconv"
-
 	"github.com/gin-gonic/gin"
 	"lan-im-go/core"
+	"lan-im-go/models"
 	"lan-im-go/repository"
+	"log"
+	"net/http"
+	"strconv"
 )
 
 // JoinRoom 处理加入群聊的 HTTP 请求
@@ -140,6 +141,86 @@ func GetRoomMembers() gin.HandlerFunc {
 		c.JSON(http.StatusOK, gin.H{
 			"room_id": roomID,
 			"members": response,
+		})
+	}
+}
+
+func CreateRoom(hub *core.Hub) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		var req struct {
+			Name string `json:"name" binding:"required"`
+		}
+		// 严苛拦截：名字都没起，建什么群？
+		if err := c.ShouldBindJSON(&req); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "物理频段名称不能为空"})
+			return
+		}
+		// ⚡ 架构师的绝对防伪：永远不要相信前端传的 UID，必须从 JWT 上下文里强行剥离！
+		userIDVal, exists := c.Get("user_id")
+		if !exists {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "鉴权防弹衣丢失，拒绝创世"})
+			return
+		}
+		creatorID := userIDVal.(int64)
+
+		// 组装物理模型
+		room := &models.Room{
+			Name:      req.Name,
+			CreatorID: creatorID,
+			Type:      2, // 2: 代表多人普通群
+		}
+
+		// ⚡ 触发底层 ACID 强一致性事务 (建群 + 加冕群主 同生共死)
+		if err := repository.Room.CreateRoomWithCreator(room, creatorID); err != nil {
+			log.Printf("[MySQL 灾难] 创世事务执行崩溃: %v\n", err)
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "物理存储层执行事务崩溃"})
+			return
+		}
+
+		// ⚡ 跨协程内存热挂载：向 Hub 引擎发射入列信令！
+		// 只要 MySQL 落盘成功，毫秒级让该用户的 WebSocket 接入这个新频段！
+		hub.RoomActionChan <- &core.RoomAction{
+			UserID: creatorID,
+			RoomID: room.ID,
+			Action: "join",
+		}
+
+		c.JSON(http.StatusOK, gin.H{
+			"message": "物理频段开辟成功，你已自动加冕为群主",
+			"room_id": room.ID,
+			"name":    room.Name,
+		})
+	}
+}
+
+// ============================================================================
+// 【拓扑回溯：拉取我的群聊清单 (解决 N+1 风暴的实战体现)】
+// ============================================================================
+func GetMyRooms() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		userIDVal, _ := c.Get("user_id")
+		userID := userIDVal.(int64)
+
+		// 呼叫底层极速 INNER JOIN 捞取数据
+		rooms, err := repository.Room.GetJoinedRooms(userID)
+		if err != nil {
+			log.Printf("[MySQL 异常] 拉取群聊拓扑失败: %v\n", err)
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "拉取群聊拓扑失败"})
+			return
+		}
+
+		// 组装干净的脱敏结构返回给前端
+		var res []map[string]interface{}
+		for _, r := range rooms {
+			res = append(res, map[string]interface{}{
+				"room_id":    r.ID,
+				"room_name":  r.Name,
+				"created_at": r.CreatedAt,
+			})
+		}
+
+		c.JSON(http.StatusOK, gin.H{
+			"rooms": res,
 		})
 	}
 }

@@ -11,6 +11,7 @@ type Room struct {
 	ID        int64  `gorm:"primaryKey;autoIncrement"` // 房间号 QID
 	Type      int8   `gorm:"type:tinyint;not null;comment:'1:双人私聊 2:多人普通群'"`
 	Name      string `gorm:"type:varchar(128);default:'';comment:'群名称，私聊可为空'"`
+	CreatorID int64
 	CreatedAt time.Time
 	UpdatedAt time.Time
 	DeletedAt gorm.DeletedAt `gorm:"index"`

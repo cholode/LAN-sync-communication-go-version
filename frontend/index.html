@@ -66,11 +66,16 @@
     </div>
     <p style="font-size: 12px; color: #888;">* 提示：退群请输入你自己的 UID；解散/踢人需超管或群主权限。</p>
     <hr style="border-color: #444; margin: 20px 0;">
-    <h3>📦 第四矩阵：大文件极速切片流转</h3>
+    <h3>📦 第四矩阵：大文件极速流转与高阶调度</h3>
     <input type="file" id="file-input">
-    <button onclick="startUpload()" style="background: #d35400;">执行分片上传与物理合并</button>
-    <p id="upload-status" style="margin-top: 15px;">等待挂载载荷...</p>
-    <div class="progress-bg"><div id="progress-bar"></div></div>
+    <div class="flex-row">
+      <button id="btn-upload" onclick="startUpload()" style="background: #d35400;">1. 扫描战损并执行流转</button>
+      <button id="btn-cancel" onclick="cancelUpload()" style="background: #7f8c8d; cursor: not-allowed;" disabled>2. 紧急制动 (中断并清理)</button>
+    </div>
+    <p id="upload-status" style="margin-top: 15px; font-size: 13px;">等待挂载载荷...</p>
+    <div class="progress-bg">
+      <div id="progress-bar"></div>
+    </div>
   </div>
 
   <script>
@@ -238,51 +243,168 @@
     }
 
     // ============== 大文件极速切片模块 ==============
+    // 全局状态机锁
+    let isUploading = false;
+    // 原生 Fetch 拦截器
+    let uploadAbortController = null;
+
     async function startUpload() {
-      if (!jwtToken) return alert("请先登录！");
-      const fileInput = document.getElementById('file-input');
-      if (!fileInput.files.length) return alert("请选择文件！");
-      const file = fileInput.files[0];
-      const chunkSize = 1 * 1024 * 1024;
-      const totalChunks = Math.ceil(file.size / chunkSize);
-      const fileHash = "mock_hash_" + file.name + "_" + file.size;
-      document.getElementById('upload-status').innerText = `准备流转 ${(file.size/1024/1024).toFixed(2)}MB...`;
+        if (!jwtToken) return alert("严苛红线：防弹衣丢失！请先登录。");
+        if (isUploading) return alert("系统正在执行高负载 I/O，请勿重复下达指令！");
 
-      for (let i = 0; i < totalChunks; i++) {
-        const chunk = file.slice(i * chunkSize, Math.min((i + 1) * chunkSize, file.size));
-        const formData = new FormData();
-        formData.append('chunk', chunk);
-        formData.append('hash', fileHash);
-        formData.append('chunk_index', i);
+        const fileInput = document.getElementById('file-input');
+        if (!fileInput.files.length) return alert("请挂载物理文件！");
+
+        const file = fileInput.files[0];
+        const chunkSize = 1 * 1024 * 1024; // 1MB 切片
+        const totalChunks = Math.ceil(file.size / chunkSize);
+
+        // 工业级做法：应该用 SparkMD5 算文件 hash，这里为了演示继续用简易 hash
+        const fileHash = "mock_hash_" + file.name + "_" + file.size;
+
+        // ⚡ 状态机上锁，UI 锁定
+        isUploading = true;
+        document.getElementById('btn-upload').disabled = true;
+        document.getElementById('btn-upload').style.background = "#555";
+        document.getElementById('btn-cancel').disabled = false;
+        document.getElementById('btn-cancel').style.background = "#e74c3c";
+        uploadAbortController = new AbortController(); // 实例化刹车片
+
         try {
-          const res = await fetch(`${API_BASE}/upload/chunk`, {
-            method: 'POST',
-            headers: {'Authorization': `Bearer ${jwtToken}`},
-            body: formData
-          });
-          if (!res.ok) throw new Error("分片阻断");
-          const percent = Math.round(((i + 1) / totalChunks) * 100);
-          document.getElementById('progress-bar').style.width = percent + '%';
-          document.getElementById('upload-status').innerText = `物理输送中: ${percent}%`;
-        } catch (err) {
-          return alert("传输中断！");
-        }
-      }
+            // ==========================================
+            // 🛡️ 第 0 阶段：呼叫后端探针，执行战损检测 (断点续传/秒传核心)
+            // ==========================================
+            document.getElementById('upload-status').innerText = `正在向服务器请求战损扫描...`;
+            const checkRes = await fetch(`${API_BASE}/upload/status?hash=${fileHash}&filename=${encodeURIComponent(file.name)}`, {
+                headers: {'Authorization': `Bearer ${jwtToken}`}
+            });
+            const checkData = await checkRes.json();
 
-      const mergeData = new FormData();
-      mergeData.append('hash', fileHash);
-      mergeData.append('filename', file.name);
-      mergeData.append('total_chunks', totalChunks);
-      const mergeRes = await fetch(`${API_BASE}/upload/merge`, {
-        method: 'POST',
-        headers: {'Authorization': `Bearer ${jwtToken}`},
-        body: mergeData
-      });
-      const mergeResult = await mergeRes.json();
-      if (mergeRes.ok) {
-        document.getElementById('upload-status').innerText = `✅ 合并成功！${mergeResult.download_url}`;
-        if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ room_id: 1, content: `[超载荷文件] ${mergeResult.download_url}` }));
-      } else document.getElementById('upload-status').innerText = `❌ 合并失败: ${mergeResult.error}`;
+            if (checkData.status === "completed") {
+                // 终极白嫖：文件已存在，瞬间完成！
+                document.getElementById('progress-bar').style.width = '100%';
+                document.getElementById('progress-bar').style.background = '#27ae60';
+                document.getElementById('upload-status').innerText = `⚡ 秒传触发！链路已存在: ${checkData.download_url}`;
+                unlockUploadUI();
+                return;
+            }
+
+            // 提取已经存在的切片索引白名单
+            const uploadedChunks = checkData.uploaded_chunks || [];
+            document.getElementById('upload-status').innerText = `战损扫描完毕。共 ${totalChunks} 块，发现 ${uploadedChunks.length} 块完好遗骸，开始接力补传...`;
+
+            // ==========================================
+            // 🚀 第 1 阶段：跳过遗骸，精准补传
+            // ==========================================
+            for (let i = 0; i < totalChunks; i++) {
+                // 严苛防线：如果这个切片在后端已经有了，直接跳过，绝不浪费一滴带宽！
+                if (uploadedChunks.includes(i)) {
+                    updateProgress(i + 1, totalChunks);
+                    continue;
+                }
+
+                const chunk = file.slice(i * chunkSize, Math.min((i + 1) * chunkSize, file.size));
+                const formData = new FormData();
+                formData.append('chunk', chunk);
+                formData.append('hash', fileHash);
+                formData.append('chunk_index', i);
+
+                // 挂载 AbortController 的 signal，使其具备随时被绞杀的能力
+                const res = await fetch(`${API_BASE}/upload/chunk`, {
+                    method: 'POST',
+                    headers: {'Authorization': `Bearer ${jwtToken}`},
+                    body: formData,
+                    signal: uploadAbortController.signal
+                });
+
+                if (!res.ok) throw new Error("分片物理落盘失败");
+                updateProgress(i + 1, totalChunks);
+            }
+
+            // ==========================================
+            // 📦 第 2 阶段：呼叫磁盘执行物理级顺序合并
+            // ==========================================
+            document.getElementById('upload-status').innerText = `切片已全部送达，正在呼叫后端磁盘 I/O 执行物理合并...`;
+            const mergeData = new FormData();
+            mergeData.append('hash', fileHash);
+            mergeData.append('filename', file.name);
+            mergeData.append('total_chunks', totalChunks);
+
+            const mergeRes = await fetch(`${API_BASE}/upload/merge`, {
+                method: 'POST',
+                headers: {'Authorization': `Bearer ${jwtToken}`},
+                body: mergeData
+            });
+
+            const mergeResult = await mergeRes.json();
+            if (mergeRes.ok) {
+                document.getElementById('upload-status').innerText = `✅ 物理合并成功！档案提取密文: ${mergeResult.download_url}`;
+                // 可选：顺手推送到聊天室
+                if (ws && ws.readyState === WebSocket.OPEN) {
+                    ws.send(JSON.stringify({
+                        room_id: 1,
+                        content: `[超载荷文件] 我上传了机密档案: ${mergeResult.download_url}`
+                    }));
+                }
+            } else {
+                throw new Error(mergeResult.error);
+            }
+        } catch (err) {
+            if (err.name === 'AbortError') {
+                document.getElementById('upload-status').innerText = `🛑 传输已被主动拦截！`;
+            } else {
+                document.getElementById('upload-status').innerText = `❌ 网络链路断裂: ${err.message}`;
+            }
+        } finally {
+            unlockUploadUI();
+        }
+    }
+
+    // 紧急制动与物理垃圾回收
+    async function cancelUpload() {
+        if (!isUploading) return;
+
+        // 1. 瞬间绞杀前端正在运行的 fetch 请求
+        if (uploadAbortController) {
+            uploadAbortController.abort();
+        }
+
+        const fileInput = document.getElementById('file-input');
+        if (!fileInput.files.length) return;
+        const file = fileInput.files[0];
+        const fileHash = "mock_hash_" + file.name + "_" + file.size;
+
+        document.getElementById('upload-status').innerText = `正在呼叫云端进行物理残骸抹除...`;
+
+        // 2. 呼叫后端执行垃圾回收
+        try {
+            const res = await fetch(`${API_BASE}/upload/cancel?hash=${fileHash}`, {
+                method: 'DELETE',
+                headers: {'Authorization': `Bearer ${jwtToken}`}
+            });
+
+            if (res.ok) {
+                document.getElementById('upload-status').innerText = `🛑 传输已彻底终止，云端物理残骸已抹除。`;
+                document.getElementById('progress-bar').style.width = '0%';
+            }
+        } catch (e) {
+            document.getElementById('upload-status').innerText = `⚠️ 传输已在前端拦截，但清理云端残骸失败。`;
+        }
+    }
+
+    function updateProgress(current, total) {
+        const percent = Math.round((current / total) * 100);
+        document.getElementById('progress-bar').style.width = percent + '%';
+        document.getElementById('progress-bar').style.background = '#8e44ad';
+        document.getElementById('upload-status').innerText = `物理输送中: ${percent}% (分片 ${current}/${total})`;
+    }
+
+    function unlockUploadUI() {
+        isUploading = false;
+        document.getElementById('btn-upload').disabled = false;
+        document.getElementById('btn-upload').style.background = "#d35400";
+        document.getElementById('btn-cancel').disabled = true;
+        document.getElementById('btn-cancel').style.background = "#7f8c8d";
     }
   </script>
 </body>

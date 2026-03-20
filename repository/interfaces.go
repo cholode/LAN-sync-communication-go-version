@@ -23,14 +23,14 @@ type UserRepository interface {
 
 // RoomRepository 房间元数据领域
 type RoomRepository interface {
-	// 基础操作
-	CreateRoom(room *models.Room) error
+	// ⚡ 核心创世动作：建群与加冕群主必须强绑定，强制业务层走底层 ACID 事务！
+	CreateRoomWithCreator(room *models.Room, creatorID int64) error
 	GetRoomByID(roomID int64) (*models.Room, error)
 	// 管控：指定精确 ID 解散群聊
 	SoftDeleteRoom(roomID int64) error
 	// 业务：联表查询该用户已加入的所有群聊列表 (解决 N+1 性能风暴)
 	GetJoinedRooms(userID int64) ([]*models.Room, error)
-
+	// 防爬虫搜索机制
 	GetRoomByExactName(exactName string) (*models.Room, error)
 }
 
