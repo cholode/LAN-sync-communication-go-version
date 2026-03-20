@@ -2,410 +2,384 @@
 <html lang="zh-CN">
 <head>
   <meta charset="UTF-8">
-  <title>LAN-IM 架构师终极测试台 (全双工 + 双轨制)</title>
+  <title>LAN-IM 界面</title>
   <style>
-    body{font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;background:#1e1e1e;color:#fff;margin:0;padding:20px;display:flex;flex-wrap:wrap;gap:20px}
-    .panel{background:#2d2d2d;padding:20px;border-radius:8px;box-shadow:0 4px 6px rgba(0,0,0,0.3);flex:1;min-width:400px;max-width:48%;}
-    input,button{padding:10px;margin:5px 0;border:none;border-radius:4px;width:100%;box-sizing:border-box}
-    input{background:#3d3d3d;color:#fff;border: 1px solid #555;}
-    button{background:#007acc;color:#fff;cursor:pointer;font-weight:bold;transition: background 0.2s;}
-    button:hover{background:#005999}
-    #chat-box{height:300px;background:#000;border:1px solid #444;overflow-y:auto;padding:10px;margin-bottom:10px;font-family:Consolas, monospace;}
-    .log-sys{color:#ce9178;}
-    .log-msg{color:#4fc1ff;}
-    .log-err{color:#f44336;}
-    .log-hist{color:#b5cea8;}
-    #progress-bar{height:20px;background:#8e44ad;width:0%;transition:width 0.2s;border-radius:10px}
-    .progress-bg{background:#3d3d3d;border-radius:10px;margin-top:10px;overflow:hidden}
-    .flex-row {display: flex; gap: 10px; align-items: center;}
+    body{font-family:'Segoe UI',Tahoma,sans-serif;background:#121212;color:#fff;margin:0;display:flex;height:100vh;overflow:hidden;}
+    .sidebar{width:300px;background:#1a1a1a;border-right:1px solid #333;display:flex;flex-direction:column;}
+    .sidebar-header{padding:20px;background:#222;border-bottom:1px solid #333;}
+    .room-list{flex:1;overflow-y:auto;padding:10px;}
+    .room-item{padding:15px;margin-bottom:8px;background:#2d2d2d;border-radius:6px;cursor:pointer;transition:0.2s;border-left:4px solid transparent;}
+    .room-item:hover{background:#3d3d3d;}
+    .room-item.active{border-left-color:#007acc;background:#2a2a2a;}
+    .room-name{font-weight:bold;font-size:15px;}
+    .room-id{font-size:12px;color:#888;margin-top:5px;}
+    .main-view{flex:1;display:flex;flex-direction:column;background:#1e1e1e;}
+    .chat-header{height:60px;background:#222;border-bottom:1px solid #333;display:flex;align-items:center;padding:0 20px;font-weight:bold;justify-content:space-between;}
+    #chat-box{flex:1;overflow-y:auto;padding:20px;font-family:Consolas,monospace;}
+    .input-area{padding:20px;background:#222;border-top:1px solid #333;display:flex;gap:10px;}
+    input[type="text"]{flex:1;padding:12px;background:#333;border:1px solid #444;color:white;border-radius:6px;outline:none;}
+    button{padding:12px 20px;background:#007acc;color:white;border:none;border-radius:6px;cursor:pointer;font-weight:bold;transition:0.2s;}
+    button:hover{background:#005999;}
+    button.danger{background:#c0392b;}
+    .log-sys{color:#f39c12;margin-bottom:8px;}
+    .log-msg{color:#2ecc71;margin-bottom:8px;}
+    .log-err{color:#e74c3c;margin-bottom:8px;}
+    .log-hist{color:#bdc3c7;margin-bottom:8px;}
+    .control-panel{width:350px;background:#1a1a1a;border-left:1px solid #333;padding:20px;overflow-y:auto;}
+    .panel-section{background:#2d2d2d;padding:15px;border-radius:8px;margin-bottom:20px;}
+    .panel-section h3{margin-top:0;font-size:14px;color:#aaa;border-bottom:1px solid #444;padding-bottom:10px;}
+    .flex-row{display:flex;gap:10px;margin-bottom:10px;}
+    #progress-bar{height:8px;background:#8e44ad;width:0%;border-radius:4px;transition:width 0.2s;}
+    .progress-bg{background:#444;border-radius:4px;margin-top:10px;overflow:hidden;height:8px;}
   </style>
 </head>
 <body>
-  <div class="panel">
-    <h3>🔐 第一防线：JWT 身份鉴权</h3>
-    <div class="flex-row">
-      <input type="text" id="username" placeholder="用户名 (如: admin)" value="admin">
-      <input type="password" id="password" placeholder="密码 (如: 123456)" value="123456">
+  <div class="sidebar">
+    <div class="sidebar-header">
+      <h3 style="margin:0;color:#007acc;">我的群聊列表</h3>
+      <button onclick="logout()" style="width:100%;margin-top:10px;background:#444;">退出登录</button>
     </div>
-    <div class="flex-row">
-      <button onclick="register()">1. 注册落盘</button>
-      <button onclick="login()" style="background: #d35400;">2. 签发 Token</button>
-    </div>
-    <p id="token-display" style="word-break: break-all; color: #888; font-size: 12px;">当前状态：未挂载防弹衣</p>
-    <hr style="border-color: #444; margin: 20px 0;">
-    <h3>🚀 第二引擎：全双工频段 & 历史溯源</h3>
-    <div class="flex-row">
-      <button onclick="connectWS()" style="background: #27ae60;">3. 建立 WebSocket 长连接</button>
-    </div>
-    <div id="chat-box">
-      <div class="log-sys">等待系统指令...</div>
-    </div>
-    <div class="flex-row">
-      <input type="number" id="room-id" placeholder="群聊 RoomID" value="1" style="width: 30%;">
-      <input type="text" id="msg-content" placeholder="输入高频消息文本..." style="width: 70%;">
-    </div>
-    <div class="flex-row">
-      <button onclick="sendMsg()">发射消息 (Pub/Sub 广播)</button>
-      <button onclick="fetchHistory()" style="background: #2980b9; width: 60%;">📜 拉取历史记录</button>
+    <div class="room-list" id="room-list">
+      <div style="color:#666;text-align:center;margin-top:20px;">正在加载群聊列表...</div>
     </div>
   </div>
 
-  <div class="panel">
-    <h3>🛡️ 第三矩阵：群聊拓扑与权限仲裁</h3>
-    <p style="font-size: 13px; color: #aaa;">指令下达后，后端 Hub 将在纳秒级完成内存路由树的热更新：</p>
-    <div class="flex-row">
-      <input type="number" id="topo-room-id" placeholder="目标 RoomID (必填)" style="width: 50%;">
-      <input type="number" id="topo-user-id" placeholder="被踢者 UserID (加群/看名单不填)" style="width: 50%;">
+  <div class="main-view">
+    <div class="chat-header">
+      <span id="current-room-title">未选择群聊，请选择或创建群聊</span>
+      <button onclick="fetchHistory()" style="background:transparent;border:1px solid #555;padding:6px 12px;">获取历史消息</button>
     </div>
-    <div class="flex-row" style="margin-top: 10px;">
-      <button onclick="joinRoom()" style="background: #16a085;">➕ 申请加群</button>
-      <button onclick="getRoomMembers()" style="background: #8e44ad;">📋 查看花名册</button>
+    <div id="chat-box"></div>
+    <div class="input-area">
+      <input type="text" id="msg-content" placeholder="输入消息 (按 Enter 发送)" onkeypress="handleEnter(event)">
+      <button onclick="sendMsg()">发送</button>
     </div>
-    <div class="flex-row">
-      <button onclick="removeMember()" style="background: #c0392b;">🔪 驱逐成员/退群/解散</button>
+  </div>
+
+  <div class="control-panel">
+    <div class="panel-section">
+      <h3>创建与加入群聊</h3>
+      <div class="flex-row">
+        <input type="text" id="new-room-name" placeholder="群聊名称" style="width:60%;">
+        <button onclick="createRoom()" style="background:#27ae60;width:40%;">创建群聊</button>
+      </div>
+      <div class="flex-row">
+        <input type="number" id="join-room-id" placeholder="群聊 ID" style="width:60%;">
+        <button onclick="joinRoom()" style="background:#f39c12;width:40%;">加入群聊</button>
+      </div>
     </div>
-    <p style="font-size: 12px; color: #888;">* 提示：退群请输入你自己的 UID；解散/踢人需超管或群主权限。</p>
-    <hr style="border-color: #444; margin: 20px 0;">
-    <h3>📦 第四矩阵：大文件极速流转与高阶调度</h3>
-    <input type="file" id="file-input">
-    <div class="flex-row">
-      <button id="btn-upload" onclick="startUpload()" style="background: #d35400;">1. 扫描战损并执行流转</button>
-      <button id="btn-cancel" onclick="cancelUpload()" style="background: #7f8c8d; cursor: not-allowed;" disabled>2. 紧急制动 (中断并清理)</button>
+
+    <div class="panel-section">
+      <h3>群成员管理</h3>
+      <button onclick="getRoomMembers()" style="width:100%;margin-bottom:10px;background:#2980b9;">获取群成员列表</button>
+      <div class="flex-row">
+        <input type="number" id="kick-user-id" placeholder="用户ID (退群填自己)" style="width:60%;">
+        <button class="danger" onclick="removeMember()" style="width:40%;">移除成员</button>
+      </div>
     </div>
-    <p id="upload-status" style="margin-top: 15px; font-size: 13px;">等待挂载载荷...</p>
-    <div class="progress-bg">
-      <div id="progress-bar"></div>
+
+    <div class="panel-section">
+      <h3>文件传输</h3>
+      <input type="file" id="file-input" style="width:100%;margin-bottom:10px;">
+      <div class="flex-row">
+        <button id="btn-upload" onclick="startUpload()" style="background:#8e44ad;width:60%;">开始上传</button>
+        <button id="btn-cancel" onclick="cancelUpload()" class="danger" style="width:40%;" disabled>取消上传</button>
+      </div>
+      <div style="font-size:12px;color:#888;margin-top:10px;" id="upload-status">等待选择文件...</div>
+      <div class="progress-bg"><div id="progress-bar"></div></div>
     </div>
   </div>
 
   <script>
     const API_BASE = "http://127.0.0.1:8080/api/v1";
     const WS_BASE = "ws://127.0.0.1:8080/api/v1/ws";
-    let jwtToken = "";
-    let ws = null;
+    const jwtToken = localStorage.getItem("lan_im_token");
 
-    function logToChat(msg, type) {
+    if (!jwtToken) {
+      alert("请先登录！");
+      window.location.href = "login.html";
+    }
+
+    let ws = null;
+    let currentRoomId = null;
+    let isUploading = false;
+    let uploadAbortController = null;
+
+    function log(msg, type) {
       const box = document.getElementById("chat-box");
       box.innerHTML += `<div class="${type}">[${new Date().toLocaleTimeString()}] ${msg}</div>`;
       box.scrollTop = box.scrollHeight;
     }
 
-    // ============== 身份鉴权模块 ==============
-    async function register() {
-      const u = document.getElementById("username").value;
-      const p = document.getElementById("password").value;
+    function logout() {
+      localStorage.removeItem("lan_im_token");
+      window.location.href = "login.html";
+    }
+
+    async function init() {
+      await loadMyRooms();
+      connectWS();
+    }
+
+    async function loadMyRooms() {
       try {
-        const res = await fetch(`${API_BASE}/register`, {
-          method: 'POST',
-          headers: {'Content-Type': 'application/json'},
-          body: JSON.stringify({username: u, password: p})
+        const res = await fetch(`${API_BASE}/my_rooms`, {
+          headers: { 'Authorization': `Bearer ${jwtToken}` }
         });
         const data = await res.json();
-        alert(res.ok ? "✅ 物理落盘成功，请点击登录！" : "❌ 注册失败: " + data.error);
+        const listObj = document.getElementById("room-list");
+        if (!res.ok) return listObj.innerHTML = `<div style="color:red;text-align:center;">加载群聊失败</div>`;
+        listObj.innerHTML = "";
+        if (!data.rooms || data.rooms.length === 0) {
+          listObj.innerHTML = `<div style="color:#888;text-align:center;margin-top:20px;">暂无加入的群聊</div>`;
+          return;
+        }
+        data.rooms.forEach(room => {
+          const div = document.createElement("div");
+          div.className = "room-item";
+          div.onclick = () => selectRoom(room.room_id, room.room_name, div);
+          div.innerHTML = `<div class="room-name"># ${room.room_name}</div><div class="room-id">ID: ${room.room_id}</div>`;
+          listObj.appendChild(div);
+        });
       } catch (e) {
-        alert("网络请求失败");
+        log("加载群列表网络异常", "log-err");
       }
     }
 
-    async function login() {
-      const u = document.getElementById("username").value;
-      const p = document.getElementById("password").value;
-      try {
-        const res = await fetch(`${API_BASE}/login`, {
-          method: 'POST',
-          headers: {'Content-Type': 'application/json'},
-          body: JSON.stringify({username: u, password: p})
-        });
-        const data = await res.json();
-        if (res.ok) {
-          jwtToken = data.token;
-          document.getElementById("token-display").innerText = "当前防弹衣: " + jwtToken.substring(0, 30) + "...";
-          logToChat("🔐 鉴权通过，已获取 JWT Token。", "log-sys");
-        } else alert("登录失败: " + data.error);
-      } catch (e) {
-        alert("网络请求失败");
-      }
+    function selectRoom(id, name, element) {
+      currentRoomId = id;
+      document.getElementById("current-room-title").innerText = `当前群聊：${name} (ID: ${id})`;
+      document.querySelectorAll('.room-item').forEach(el => el.classList.remove('active'));
+      if(element) element.classList.add('active');
+      document.getElementById("chat-box").innerHTML = "";
+      log(`已切换至群聊 [${id}]，可获取历史消息。`, "log-sys");
     }
 
-    // ============== 全双工通信模块 ==============
     function connectWS() {
-      if (!jwtToken) return alert("严苛红线：请先登录获取 Token！");
-      if (ws) ws.close();
       ws = new WebSocket(`${WS_BASE}?token=${jwtToken}`);
-      ws.onopen = () => logToChat("✅ 成功穿透后端防火墙，接管 Hub 广播通道！", "log-sys");
-      ws.onclose = (e) => logToChat(`⚠️ 物理连接被引擎剔除 (状态码: ${e.code})`, "log-err");
-      ws.onerror = () => logToChat("❌ WebSocket 底层 Socket 发生崩溃！", "log-err");
+      ws.onopen = () => log("WebSocket 连接成功", "log-sys");
+      ws.onclose = () => log("WebSocket 连接断开", "log-err");
+      ws.onerror = () => log("WebSocket 连接异常", "log-err");
       ws.onmessage = (e) => {
-        const messages = e.data.split('\n');
-        for (let i = 0; i < messages.length; i++) {
-          const rawText = messages[i].trim();
-          if (!rawText) continue;
+        const msgs = e.data.split('\n');
+        msgs.forEach(rawText => {
+          if (!rawText.trim()) return;
           try {
             const msg = JSON.parse(rawText);
-            const sender = msg.sender_id || msg.SenderID || "未知";
-            const room = msg.room_id || msg.RoomID || "全局";
-            const content = msg.content || msg.Content || "[空]";
-            logToChat(`🔽 [频段 ${room}] 收到 UID(${sender}) 实时广播: ${content}`, "log-msg");
+            const room = msg.room_id || msg.RoomID;
+            const content = msg.content || msg.Content;
+            const sender = msg.sender_id || msg.SenderID;
+            if (room === currentRoomId || room === "全局") {
+              log(`UID(${sender}): ${content}`, "log-msg");
+            }
           } catch (err) {
-            logToChat(`❌ 收到无法解析的畸形数据帧`, "log-err");
+            log("消息格式错误", "log-err");
           }
-        }
+        });
       };
     }
 
+    function handleEnter(e) {
+      if (e.key === 'Enter') sendMsg();
+    }
+
     function sendMsg() {
-      if (!ws || ws.readyState !== WebSocket.OPEN) return alert("通道未就绪，无法发射！");
-      const content = document.getElementById("msg-content").value;
-      if (!content) return;
-      const RoomID = parseInt(document.getElementById("room-id").value) || 1;
-      const payload = { room_id: RoomID, content: content };
-      ws.send(JSON.stringify(payload));
-      logToChat(`🔼 已向频段 [${RoomID}] 发射上行载荷: ${content}`, "log-sys");
-      document.getElementById("msg-content").value = "";
+      if (!currentRoomId) return alert("请先选择一个群聊！");
+      if (!ws || ws.readyState !== WebSocket.OPEN) return alert("连接未就绪！");
+      const input = document.getElementById("msg-content");
+      if (!input.value) return;
+      ws.send(JSON.stringify({ room_id: currentRoomId, content: input.value }));
+      log(`发送: ${input.value}`, "log-sys");
+      input.value = "";
     }
 
     async function fetchHistory() {
-      if (!jwtToken) return alert("必须携带 Token 才能访问历史档案！");
-      const RoomID = parseInt(document.getElementById("room-id").value);
-      if (!RoomID) return alert("必须指定要拉取的群聊 RoomID！");
+      if (!currentRoomId) return alert("请先选择群聊！");
       try {
-        const res = await fetch(`${API_BASE}/rooms/${RoomID}/messages`, {
+        const res = await fetch(`${API_BASE}/rooms/${currentRoomId}/messages`, {
           headers: { 'Authorization': `Bearer ${jwtToken}` }
         });
         const data = await res.json();
-        if (!res.ok) return logToChat(`❌ 拉取失败: ${data.error}`, "log-err");
         const msgs = data.data || data.messages || data || [];
-        if (!msgs.length) return logToChat(`📭 [Room ${RoomID}] 物理硬盘中暂无更多记录。`, "log-hist");
-        logToChat(`✅ 成功解冻 [Room ${RoomID}] 的 ${msgs.length} 条历史日志：`, "log-sys");
-        msgs.forEach(msg => {
-          const sender = msg.sender_id || msg.SenderID || "?";
-          const content = msg.content || msg.Content || "[空]";
-          logToChat(`📜 [历史] UID(${sender}): ${content}`, "log-hist");
-        });
-      } catch (err) {
-        logToChat(`❌ HTTP 请求发送失败`, "log-err");
+        if (!msgs.length) return log(`暂无历史消息。`, "log-hist");
+        msgs.forEach(msg => log(`[历史] UID(${msg.sender_id || msg.SenderID}): ${msg.content || msg.Content}`, "log-hist"));
+      } catch (e) {
+        log("获取历史消息异常", "log-err");
       }
     }
 
-    // ============== 拓扑与权限仲裁模块 (新增) ==============
-    async function joinRoom() {
-      if (!jwtToken) return alert("严苛红线：防弹衣丢失！");
-      const RoomID = parseInt(document.getElementById("topo-room-id").value);
-      if (!RoomID) return alert("必须输入目标 RoomID！");
+    async function createRoom() {
+      const name = document.getElementById("new-room-name").value;
+      if (!name) return alert("群聊名称不可为空");
       try {
-        const res = await fetch(`${API_BASE}/rooms/${RoomID}/join`, {
+        const res = await fetch(`${API_BASE}/rooms`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${jwtToken}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ name: name })
+        });
+        if (res.ok) {
+          alert("创建群聊成功！");
+          loadMyRooms();
+        } else alert("创建群聊失败");
+      } catch (e) {
+        alert("网络异常");
+      }
+    }
+
+    async function joinRoom() {
+      const id = parseInt(document.getElementById("join-room-id").value);
+      if (!id) return;
+      try {
+        const res = await fetch(`${API_BASE}/rooms/${id}/join`, {
           method: 'POST',
           headers: { 'Authorization': `Bearer ${jwtToken}` }
         });
-        const data = await res.json();
-        if (res.ok) logToChat(`🛡️ 拓扑操作成功：${data.message} (Room ${RoomID})`, "log-sys");
-        else logToChat(`❌ 加群受阻：${data.error}`, "log-err");
+        if (res.ok) {
+          alert("加入群聊成功！");
+          loadMyRooms();
+        } else alert("加入群聊失败");
       } catch (e) {
-        logToChat("❌ 拓扑请求异常", "log-err");
+        alert("网络异常");
       }
     }
 
     async function getRoomMembers() {
-      if (!jwtToken) return alert("严苛红线：防弹衣丢失！");
-      const RoomID = parseInt(document.getElementById("topo-room-id").value);
-      if (!RoomID) return alert("必须输入目标 RoomID！");
+      if (!currentRoomId) return alert("请先选择群聊！");
       try {
-        const res = await fetch(`${API_BASE}/rooms/${RoomID}/members`, {
-          method: 'GET',
+        const res = await fetch(`${API_BASE}/rooms/${currentRoomId}/members`, {
           headers: { 'Authorization': `Bearer ${jwtToken}` }
         });
         const data = await res.json();
         if (res.ok) {
-          logToChat(`📋 [Room ${RoomID}] 成员名单拉取成功：`, "log-sys");
-          data.members.forEach(m => logToChat(` - UID: ${m.user_id} | Name: ${m.username}`, "log-sys"));
-        } else logToChat(`❌ 越权探测被拦截：${data.error}`, "log-err");
+          log(`[群成员列表]：`, "log-sys");
+          data.members.forEach(m => log(` - UID: ${m.user_id} | Name: ${m.username}`, "log-sys"));
+        } else log(`权限不足：${data.error}`, "log-err");
       } catch (e) {
-        logToChat("❌ 拓扑请求异常", "log-err");
+        log("请求异常", "log-err");
       }
     }
 
     async function removeMember() {
-      if (!jwtToken) return alert("严苛红线：防弹衣丢失！");
-      const RoomID = parseInt(document.getElementById("topo-room-id").value);
-      const TargetUID = parseInt(document.getElementById("topo-user-id").value);
-      if (!RoomID || !TargetUID) return alert("必须输入 RoomID 和 被踢者 UserID！");
+      if (!currentRoomId) return alert("请先选择群聊！");
+      const targetId = parseInt(document.getElementById("kick-user-id").value);
+      if (!targetId) return;
       try {
-        const res = await fetch(`${API_BASE}/rooms/${RoomID}/members/${TargetUID}`, {
+        const res = await fetch(`${API_BASE}/rooms/${currentRoomId}/members/${targetId}`, {
           method: 'DELETE',
           headers: { 'Authorization': `Bearer ${jwtToken}` }
         });
-        const data = await res.json();
-        if (res.ok) logToChat(`🔪 执行指令成功：${data.message}`, "log-err");
-        else logToChat(`❌ 仲裁庭驳回：${data.error}`, "log-err");
+        if (res.ok) {
+          log(`操作成功！`, "log-sys");
+          loadMyRooms();
+        } else log(`操作失败：${(await res.json()).error}`, "log-err");
       } catch (e) {
-        logToChat("❌ 拓扑请求异常", "log-err");
+        log("请求异常", "log-err");
       }
     }
 
-    // ============== 大文件极速切片模块 ==============
-    // 全局状态机锁
-    let isUploading = false;
-    // 原生 Fetch 拦截器
-    let uploadAbortController = null;
-
     async function startUpload() {
-        if (!jwtToken) return alert("严苛红线：防弹衣丢失！请先登录。");
-        if (isUploading) return alert("系统正在执行高负载 I/O，请勿重复下达指令！");
+      if (!currentRoomId) return alert("请先选择群聊！");
+      if (isUploading) return;
+      const fileInput = document.getElementById('file-input');
+      if (!fileInput.files.length) return alert("请选择文件！");
+      const file = fileInput.files[0];
+      const chunkSize = 1 * 1024 * 1024;
+      const totalChunks = Math.ceil(file.size / chunkSize);
+      const fileHash = "mock_hash_" + file.name + "_" + file.size;
+      isUploading = true;
+      document.getElementById('btn-upload').disabled = true;
+      document.getElementById('btn-cancel').disabled = false;
+      uploadAbortController = new AbortController();
+      const statusBox = document.getElementById('upload-status');
 
-        const fileInput = document.getElementById('file-input');
-        if (!fileInput.files.length) return alert("请挂载物理文件！");
-
-        const file = fileInput.files[0];
-        const chunkSize = 1 * 1024 * 1024; // 1MB 切片
-        const totalChunks = Math.ceil(file.size / chunkSize);
-
-        // 工业级做法：应该用 SparkMD5 算文件 hash，这里为了演示继续用简易 hash
-        const fileHash = "mock_hash_" + file.name + "_" + file.size;
-
-        // ⚡ 状态机上锁，UI 锁定
-        isUploading = true;
-        document.getElementById('btn-upload').disabled = true;
-        document.getElementById('btn-upload').style.background = "#555";
-        document.getElementById('btn-cancel').disabled = false;
-        document.getElementById('btn-cancel').style.background = "#e74c3c";
-        uploadAbortController = new AbortController(); // 实例化刹车片
-
-        try {
-            // ==========================================
-            // 🛡️ 第 0 阶段：呼叫后端探针，执行战损检测 (断点续传/秒传核心)
-            // ==========================================
-            document.getElementById('upload-status').innerText = `正在向服务器请求战损扫描...`;
-            const checkRes = await fetch(`${API_BASE}/upload/status?hash=${fileHash}&filename=${encodeURIComponent(file.name)}`, {
-                headers: {'Authorization': `Bearer ${jwtToken}`}
-            });
-            const checkData = await checkRes.json();
-
-            if (checkData.status === "completed") {
-                // 终极白嫖：文件已存在，瞬间完成！
-                document.getElementById('progress-bar').style.width = '100%';
-                document.getElementById('progress-bar').style.background = '#27ae60';
-                document.getElementById('upload-status').innerText = `⚡ 秒传触发！链路已存在: ${checkData.download_url}`;
-                unlockUploadUI();
-                return;
-            }
-
-            // 提取已经存在的切片索引白名单
-            const uploadedChunks = checkData.uploaded_chunks || [];
-            document.getElementById('upload-status').innerText = `战损扫描完毕。共 ${totalChunks} 块，发现 ${uploadedChunks.length} 块完好遗骸，开始接力补传...`;
-
-            // ==========================================
-            // 🚀 第 1 阶段：跳过遗骸，精准补传
-            // ==========================================
-            for (let i = 0; i < totalChunks; i++) {
-                // 严苛防线：如果这个切片在后端已经有了，直接跳过，绝不浪费一滴带宽！
-                if (uploadedChunks.includes(i)) {
-                    updateProgress(i + 1, totalChunks);
-                    continue;
-                }
-
-                const chunk = file.slice(i * chunkSize, Math.min((i + 1) * chunkSize, file.size));
-                const formData = new FormData();
-                formData.append('chunk', chunk);
-                formData.append('hash', fileHash);
-                formData.append('chunk_index', i);
-
-                // 挂载 AbortController 的 signal，使其具备随时被绞杀的能力
-                const res = await fetch(`${API_BASE}/upload/chunk`, {
-                    method: 'POST',
-                    headers: {'Authorization': `Bearer ${jwtToken}`},
-                    body: formData,
-                    signal: uploadAbortController.signal
-                });
-
-                if (!res.ok) throw new Error("分片物理落盘失败");
-                updateProgress(i + 1, totalChunks);
-            }
-
-            // ==========================================
-            // 📦 第 2 阶段：呼叫磁盘执行物理级顺序合并
-            // ==========================================
-            document.getElementById('upload-status').innerText = `切片已全部送达，正在呼叫后端磁盘 I/O 执行物理合并...`;
-            const mergeData = new FormData();
-            mergeData.append('hash', fileHash);
-            mergeData.append('filename', file.name);
-            mergeData.append('total_chunks', totalChunks);
-
-            const mergeRes = await fetch(`${API_BASE}/upload/merge`, {
-                method: 'POST',
-                headers: {'Authorization': `Bearer ${jwtToken}`},
-                body: mergeData
-            });
-
-            const mergeResult = await mergeRes.json();
-            if (mergeRes.ok) {
-                document.getElementById('upload-status').innerText = `✅ 物理合并成功！档案提取密文: ${mergeResult.download_url}`;
-                // 可选：顺手推送到聊天室
-                if (ws && ws.readyState === WebSocket.OPEN) {
-                    ws.send(JSON.stringify({
-                        room_id: 1,
-                        content: `[超载荷文件] 我上传了机密档案: ${mergeResult.download_url}`
-                    }));
-                }
-            } else {
-                throw new Error(mergeResult.error);
-            }
-        } catch (err) {
-            if (err.name === 'AbortError') {
-                document.getElementById('upload-status').innerText = `🛑 传输已被主动拦截！`;
-            } else {
-                document.getElementById('upload-status').innerText = `❌ 网络链路断裂: ${err.message}`;
-            }
-        } finally {
-            unlockUploadUI();
+      try {
+        statusBox.innerText = `检查文件上传状态...`;
+        const checkRes = await fetch(`${API_BASE}/upload/status?hash=${fileHash}&filename=${encodeURIComponent(file.name)}`, {
+          headers: {'Authorization': `Bearer ${jwtToken}`}
+        });
+        const checkData = await checkRes.json();
+        if (checkData.status === "completed") {
+          document.getElementById('progress-bar').style.width = '100%';
+          statusBox.innerText = `文件秒传成功！`;
+          ws.send(JSON.stringify({ room_id: currentRoomId, content: `[文件] ${checkData.download_url}` }));
+          unlockUploadUI();
+          return;
         }
+        const uploadedChunks = checkData.uploaded_chunks || [];
+        statusBox.innerText = `检测到已上传分片，继续上传...`;
+
+        for (let i = 0; i < totalChunks; i++) {
+          if (uploadedChunks.includes(i)) {
+            updateProgress(i + 1, totalChunks);
+            continue;
+          }
+          const formData = new FormData();
+          formData.append('chunk', file.slice(i * chunkSize, Math.min((i + 1) * chunkSize, file.size)));
+          formData.append('hash', fileHash);
+          formData.append('chunk_index', i);
+          const res = await fetch(`${API_BASE}/upload/chunk`, {
+            method: 'POST',
+            headers: {'Authorization': `Bearer ${jwtToken}`},
+            body: formData,
+            signal: uploadAbortController.signal
+          });
+          if (!res.ok) throw new Error("分片上传失败");
+          updateProgress(i + 1, totalChunks);
+        }
+
+        statusBox.innerText = `合并文件分片...`;
+        const mergeData = new FormData();
+        mergeData.append('hash', fileHash);
+        mergeData.append('filename', file.name);
+        mergeData.append('total_chunks', totalChunks);
+        const mergeRes = await fetch(`${API_BASE}/upload/merge`, {
+          method: 'POST',
+          headers: {'Authorization': `Bearer ${jwtToken}`},
+          body: mergeData
+        });
+        const mergeResult = await mergeRes.json();
+        if (mergeRes.ok) {
+          statusBox.innerText = `文件上传成功！`;
+          ws.send(JSON.stringify({ room_id: currentRoomId, content: `[文件] ${mergeResult.download_url}` }));
+        } else throw new Error(mergeResult.error);
+      } catch (err) {
+        statusBox.innerText = err.name === 'AbortError' ? `上传已取消！` : `上传失败: ${err.message}`;
+      } finally {
+        unlockUploadUI();
+      }
     }
 
-    // 紧急制动与物理垃圾回收
     async function cancelUpload() {
-        if (!isUploading) return;
-
-        // 1. 瞬间绞杀前端正在运行的 fetch 请求
-        if (uploadAbortController) {
-            uploadAbortController.abort();
-        }
-
-        const fileInput = document.getElementById('file-input');
-        if (!fileInput.files.length) return;
-        const file = fileInput.files[0];
-        const fileHash = "mock_hash_" + file.name + "_" + file.size;
-
-        document.getElementById('upload-status').innerText = `正在呼叫云端进行物理残骸抹除...`;
-
-        // 2. 呼叫后端执行垃圾回收
-        try {
-            const res = await fetch(`${API_BASE}/upload/cancel?hash=${fileHash}`, {
-                method: 'DELETE',
-                headers: {'Authorization': `Bearer ${jwtToken}`}
-            });
-
-            if (res.ok) {
-                document.getElementById('upload-status').innerText = `🛑 传输已彻底终止，云端物理残骸已抹除。`;
-                document.getElementById('progress-bar').style.width = '0%';
-            }
-        } catch (e) {
-            document.getElementById('upload-status').innerText = `⚠️ 传输已在前端拦截，但清理云端残骸失败。`;
-        }
+      if (!isUploading) return;
+      if (uploadAbortController) uploadAbortController.abort();
+      const file = document.getElementById('file-input').files[0];
+      if(!file) return;
+      document.getElementById('upload-status').innerText = `清理临时文件...`;
+      try {
+        await fetch(`${API_BASE}/upload/cancel?hash=mock_hash_${file.name}_${file.size}`, {
+          method: 'DELETE',
+          headers: {'Authorization': `Bearer ${jwtToken}`}
+        });
+        document.getElementById('upload-status').innerText = `上传已取消，临时文件已清理`;
+        document.getElementById('progress-bar').style.width = '0%';
+      } catch (e) {}
     }
 
-    function updateProgress(current, total) {
-        const percent = Math.round((current / total) * 100);
-        document.getElementById('progress-bar').style.width = percent + '%';
-        document.getElementById('progress-bar').style.background = '#8e44ad';
-        document.getElementById('upload-status').innerText = `物理输送中: ${percent}% (分片 ${current}/${total})`;
+    function updateProgress(c, t) {
+      document.getElementById('progress-bar').style.width = Math.round((c / t) * 100) + '%';
+      document.getElementById('upload-status').innerText = `上传进度: ${Math.round((c / t) * 100)}%`;
     }
 
     function unlockUploadUI() {
-        isUploading = false;
-        document.getElementById('btn-upload').disabled = false;
-        document.getElementById('btn-upload').style.background = "#d35400";
-        document.getElementById('btn-cancel').disabled = true;
-        document.getElementById('btn-cancel').style.background = "#7f8c8d";
+      isUploading = false;
+      document.getElementById('btn-upload').disabled = false;
+      document.getElementById('btn-cancel').disabled = true;
     }
+
+    window.onload = init;
   </script>
 </body>
 </html>

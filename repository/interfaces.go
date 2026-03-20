@@ -6,60 +6,59 @@ import (
 )
 
 // ============================================================================
-// 【领域驱动设计 (DDD) 核心持久层契约】
-// 严苛约束：业务逻辑层 (Service/Handler) 绝对不允许直接引入 gorm.DB，
-// 必须且只能调用以下接口中定义的方法！
+// 数据访问层接口定义
+// 规范：业务层禁止直接操作gorm.DB，仅允许调用以下接口方法
 // ============================================================================
 
-// UserRepository 用户与超管管控领域
+// UserRepository 用户数据访问接口
 type UserRepository interface {
-	// 基础身份
+	// 基础用户操作
 	CreateUser(user *models.User) error
 	GetByUsername(username string) (*models.User, error)
 	GetByID(id int64) (*models.User, error)
-	// 管控：只支持指定精确 ID 删除，拒绝模糊匹配
+	// 按ID软删除用户
 	SoftDeleteUser(id int64) error
 }
 
-// RoomRepository 房间元数据领域
+// RoomRepository 群组数据访问接口
 type RoomRepository interface {
-	// ⚡ 核心创世动作：建群与加冕群主必须强绑定，强制业务层走底层 ACID 事务！
+	// 创建群组并添加创建者，基于数据库事务保证一致性
 	CreateRoomWithCreator(room *models.Room, creatorID int64) error
 	GetRoomByID(roomID int64) (*models.Room, error)
-	// 管控：指定精确 ID 解散群聊
+	// 按ID软删除群组
 	SoftDeleteRoom(roomID int64) error
-	// 业务：联表查询该用户已加入的所有群聊列表 (解决 N+1 性能风暴)
+	// 查询用户加入的所有群组，优化查询性能避免N+1问题
 	GetJoinedRooms(userID int64) ([]*models.Room, error)
-	// 防爬虫搜索机制
+	// 根据名称精确查询群组
 	GetRoomByExactName(exactName string) (*models.Room, error)
 }
 
-// RoomMemberRepository 万物皆群聊的核心流转枢纽
+// RoomMemberRepository 群成员数据访问接口
 type RoomMemberRepository interface {
-	// 关系绑定与解绑
+	// 群成员管理
 	AddMember(roomID, userID int64, role int8) error
 	RemoveMember(roomID, userID int64) error
-	// 核心引擎依赖：建立 WebSocket 时拉取订阅清单
+	// 查询用户加入的所有群组ID，用于WebSocket初始化
 	GetUserRoomIDs(userID int64) ([]int64, error)
-	// 越权防御：发消息前的身份校验
+	// 校验用户是否为群成员，用于权限验证
 	CheckIsMember(roomID, userID int64) (bool, error)
-	// 业务：联表查询获取指定群聊内的所有成员详细信息 (头像、昵称、Role)
+	// 查询群成员详细信息
 	GetRoomMembers(roomID int64) ([]*models.User, error)
 }
 
-// MessageRepository 核心消息吞吐领域
+// MessageRepository 消息数据访问接口
 type MessageRepository interface {
-	// 核心写入：异步高并发落盘
+	// 异步保存消息
 	SaveMessage(msg *models.Message) error
-	// 核心查询：触顶无感加载，强依赖 MsgID 游标，严禁使用 Offset
+	// 基于游标分页查询历史消息，避免深分页性能问题
 	GetHistoryByCursor(roomID int64, cursorMsgID int64, limit int) ([]*models.Message, error)
-	// 管控：精确抹除指定用户在指定群聊内的全部历史痕迹 (命中组合索引的批量 UPDATE)
+	// 批量软删除指定用户在群组内的消息
 	SoftDeleteUserMessagesInRoom(roomID int64, userID int64) error
 }
 
 // ============================================================================
-// 【全局单例注册中心 (Registry)】
-// 作用：统一收口所有的接口实例，避免在业务代码中到处 new 对象
+// 全局数据访问接口实例
+// 统一管理所有接口实现，避免业务层重复创建实例
 // ============================================================================
 
 var (
@@ -69,10 +68,9 @@ var (
 	Message    MessageRepository
 )
 
-// InitRepositories 依赖注入引擎
-// 必须在 main.go 中基础设施 (MySQL 连接池) 启动后，立刻调用此方法
+// InitRepositories 初始化数据访问层
+// 需在数据库连接初始化完成后调用，完成依赖注入
 func InitRepositories(db *gorm.DB) {
-	// 提醒：这里的 NewXXXImpl 方法我们需要在各自的物理文件中实现
 	User = NewUserRepoImpl(db)
 	Room = NewRoomRepoImpl(db)
 	RoomMember = NewRoomMemberRepoImpl(db)

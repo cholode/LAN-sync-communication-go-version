@@ -10,146 +10,105 @@ import (
 	"log"
 	"net/http"
 	"time"
-	//"time"
 )
 
-// 全局 WebSocket 协议升级器
+// WebSocket协议升级器
 var upgrader = websocket.Upgrader{
-	ReadBufferSize:  4096, // 扩容到 4KB，与 client.go 中的 maxMessageSize 保持一致
+	ReadBufferSize:  4096,
 	WriteBufferSize: 4096,
-	// 跨域校验函数 (架构师红线：生产环境必须校验 Origin，防止 CSRF 劫持 WebSocket 握手)
+	// 跨域校验，生产环境需配置合法域名，防止CSRF攻击
 	CheckOrigin: func(r *http.Request) bool {
+		// 生产环境替换为正式域名校验
 		// return strings.Contains(r.Header.Get("Origin"), "yourdomain.com")
-		return true // 本地开发暂且放行
+		return true // 开发环境放行跨域
 	},
 }
 
-// WsEndpoint 长连接接入大门
-// 路由挂载建议: authorized.GET("/ws", api.WsEndpoint(hub))
-// 注意：前端连接时 url 必须是 ws://ip:port/api/v1/ws?token=你的JWT
+// WsEndpoint WebSocket连接入口
+// 路由：authorized.GET("/ws", api.WsEndpoint(hub))
+// 前端连接地址：ws://ip:port/api/v1/ws?token=JWT令牌
 func WsEndpoint(hub *core.Hub) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		// ====================================================================
-		// 1. 终极身份核验 (复用 Gin Context)
-		// ====================================================================
-		// 由于这个接口被 middleware.JWTAuth() 保护，走到这里时，
-		// 用户的真实身份绝对已经被安全地注入到了 Context 中！
-
+		// 1. 身份验证：从Gin上下文获取用户ID（由JWT中间件校验通过）
 		userID, exists := c.Get("user_id")
 		if !exists {
-			log.Printf("用户不存在\n")
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "系统上下文身份丢失，拒绝握手"})
+			log.Printf("用户身份信息不存在\n")
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "身份验证失败，连接拒绝"})
 			return
 		}
 		realUserID := userID.(int64)
 
-		// ====================================================================
-		// 2. 协议升级 (HTTP -> TCP WebSocket)
-		// ====================================================================
-		// 这一步之后，不再受 HTTP 短连接的约束，进入全双工长连接状态
+		// 2. 协议升级：将HTTP协议升级为WebSocket全双工协议
 		conn, err := upgrader.Upgrade(c.Writer, c.Request, nil)
 		if err != nil {
-			log.Printf("[握手失败] 协议升级异常 UID:%d, Err:%v", realUserID, err)
-			return // Upgrade 失败时底层会自动写入 HTTP 错误响应，不要再 c.JSON 了
+			log.Printf("[连接失败] WebSocket协议升级异常 UID:%d, Err:%v", realUserID, err)
+			return
 		}
-		log.Printf("握手成功\n")
-		// ====================================================================
-		// 3. 构建初始内存路由表 (核心状态同步)
-		// ====================================================================
-		// 架构师绝杀：在连接刚建立的这一刻，去数据库查出他所有加入的群聊！
-		// 这样 Hub 在初始化他的内存节点时，就能一次性把他挂载到正确的路由树上。
+		log.Printf("WebSocket连接建立成功\n")
+
+		// 3. 初始化群聊订阅：查询用户已加入的群聊列表
 		roomIDs, err := repository.RoomMember.GetUserRoomIDs(realUserID)
 		if err != nil {
-			log.Printf("[握手警告] 无法拉取用户 %d 的群聊列表，暂以空列表初始化", realUserID)
+			log.Printf("[连接警告] 获取用户%d群聊列表失败，使用空列表初始化", realUserID)
 			roomIDs = []int64{}
 		}
 
-		// ====================================================================
-		// 4. 组装物理连接与订阅载体
-		// ====================================================================
+		// 4. 创建客户端实例，初始化消息发送通道
 		client := &core.Client{
 			Hub:    hub,
 			UserID: realUserID,
 			Conn:   conn,
-			// 工业级缓冲：防止高并发时 Send 管道瞬间被打满导致假死
-			Send: make(chan []byte, 256),
+			Send:   make(chan []byte, 256), // 缓冲通道，防止高并发阻塞
 		}
 
-		// 构建融合了上下线与动态路由的订阅动作载体
+		// 构建订阅信息，注册客户端到Hub
 		subscription := &core.Subscription{
 			Client:  client,
 			RoomIDs: roomIDs,
 		}
-
-		// 将其推入 Hub 的单线程大循环，进行无锁化挂载
 		hub.Subscribe <- subscription
 
-		///--------------------------------------------------------------------
-		// ==========================================================
-		// 前面的代码：升级协议 conn, err := upgrader.Upgrade(...)
-		// 注册进 Hub：hub.Subscribe <- sub
-		// ==========================================================
-		// 架构师的防御编程：当死循环被打破（客户端断开）时，必须清理内存，防止 Goroutine 泄露！
-		// 告诉系统：多久没收到心跳就踢人 (比如 60 秒)
-
+		// 启动消息读写协程
 		go client.ReadPump()
 		go client.WritePump()
 
+		// 延迟执行：连接断开时注销客户端并关闭连接，防止资源泄漏
 		defer func() {
-			// 注销该用户的路由节点 (假设你的 hub 有注销通道)
 			hub.Unsubscribe <- subscription
 			conn.Close()
-			log.Printf("[WebSocket] 用户 %d 的物理连接已彻底释放", realUserID)
+			log.Printf("[WebSocket] 用户%d连接已释放", realUserID)
 		}()
 
-		// 开启读泵 (Read Pump)：全双工持续监听前端发来的二进制流
+		// 消息读取循环：监听前端发送的消息
 		for {
 			_, rawMsg, err := conn.ReadMessage()
 			if err != nil {
-				// 正常断开或网络异常，跳出死循环，触发 defer 清理
+				// 连接异常断开，退出循环
 				break
 			}
 
-			// 1. 解析前端传来的载荷 (对应我们前端测试台发来的 JSON)
+			// 解析消息数据
 			var payload struct {
 				RoomID  int64  `json:"room_id"`
 				Content string `json:"content"`
 			}
 			if err := json.Unmarshal(rawMsg, &payload); err != nil {
-				log.Printf("[WebSocket 警告] 收到畸形消息: %v", err)
+				log.Printf("[WebSocket] 消息格式解析失败: %v", err)
 				continue
 			}
 
-			// 2. 组装标准消息结构体
-			// ⚡ 绝命红线 1 (零信任原则)：
-			// 发送者 ID 绝对、绝对、绝对不能从前端的 JSON 里取！
-			// 必须用我们刚刚在 JWT 中间件里解出来的 realUserID，彻底杜绝越权伪造身份！
+			// 构建消息实体，用户ID从上下文获取，禁止前端传入
 			msg := &models.Message{
-				//ID:       msgID,
 				RoomID:    payload.RoomID,
 				SenderID:  realUserID,
 				Content:   payload.Content,
 				CreatedAt: time.Now(),
 				Type:      1,
-				// Type 等其他字段视你的表结构而定
 			}
 
-			// ⚡ 绝命红线 2 (异步持久化)：
-			// 绝对不能在这里同步调用 db.Create(&msg)！
-			// 如果数据库 I/O 发生哪怕 50 毫秒的抖动，整个 WebSocket 的读循环就会卡死，导致消息积压。
-			// 必须开辟新的协程异步落盘（大厂甚至会在这里把消息丢进 Kafka）
-
-			// ⚡ 绝命红线 3 (内存级广播转发)：
-			// 将消息丢进 Hub 的全局广播通道。
-			// Hub 的大循环一旦监听到这个通道有数据，就会瞬间遍历该 RoomID 下所有的活跃连接，并推送到他们的机器上！
-			// 如果你的 Hub 设计了 Broadcast 通道，就在这里调用：
+			// 将消息发送至Hub，由Hub统一广播至群内所有在线用户
 			hub.Broadcast <- msg
-			log.Printf("[Hub 引擎] 收到来自用户 %d 往房间 %d 发送的载荷，已交由引擎广播", realUserID, payload.RoomID)
+			log.Printf("[消息中心] 用户%d向群聊%d发送消息，已完成广播", realUserID, payload.RoomID)
 		}
-
-		// ====================================================================
-		// 5. 启动读写分离双泵 (CSP 并发模型起飞)
-		// ====================================================================
-		// 释放 Gin 的 HTTP 主协程，将 TCP 句柄彻底交接给这两个常驻子协程
 	}
 }

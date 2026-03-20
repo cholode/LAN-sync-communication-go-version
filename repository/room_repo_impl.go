@@ -6,7 +6,7 @@ import (
 )
 
 type roomRepository interface {
-	// 将事务封装在底层，保证原子性
+	// 底层封装事务，保证操作原子性
 	CreateRoomWithCreator(room *models.Room, creatorID int64) error
 	GetRoomByID(roomID int64) (*models.Room, error)
 	SoftDeleteRoom(roomID int64) error
@@ -22,23 +22,23 @@ func NewRoomRepoImpl(db *gorm.DB) roomRepository {
 	return &roomRepoImpl{db: db}
 }
 
-// CreateRoomWithCreator 架构师红线：建群与加冕群主必须是 ACID 强事务！
+// CreateRoomWithCreator 创建群聊并添加创建者，通过事务保证原子性
 func (r *roomRepoImpl) CreateRoomWithCreator(room *models.Room, creatorID int64) error {
 	return r.db.Transaction(func(tx *gorm.DB) error {
-		// 1. 物理落盘建群
+		// 1. 创建群聊数据
 		if err := tx.Create(room).Error; err != nil {
 			return err
 		}
-		// 2. 将创世者写入映射表，赋予最高权限 (Role: 2)
+		// 2. 添加创建者为群成员并设置管理员权限 (Role: 2)
 		member := &models.RoomMember{
 			RoomID: room.ID,
 			UserID: creatorID,
 			Role:   2,
 		}
 		if err := tx.Create(member).Error; err != nil {
-			return err // 报错自动 Rollback，群也会被撤销
+			return err // 事务异常自动回滚
 		}
-		return nil // 完美执行，自动 Commit
+		return nil // 事务执行成功自动提交
 	})
 }
 
@@ -49,14 +49,14 @@ func (r *roomRepoImpl) GetRoomByID(roomID int64) (*models.Room, error) {
 }
 
 func (r *roomRepoImpl) SoftDeleteRoom(roomID int64) error {
-	// 极简魔法：因为有 gorm.DeletedAt，这里的 Delete 会被自动转换为 UPDATE deleted_at
+	// 基于gorm软删除特性，自动转换为更新deleted_at字段
 	return r.db.Delete(&models.Room{}, roomID).Error
 }
 
-// GetJoinedRooms 架构师的骄傲：彻底解决 N+1 风暴的联表查询
+// GetJoinedRooms 联表查询用户加入的群聊，避免N+1查询问题
 func (r *roomRepoImpl) GetJoinedRooms(userID int64) ([]*models.Room, error) {
 	var rooms []*models.Room
-	// 严苛细节：使用 Model 继承软删属性，利用 INNER JOIN 一次性把用户所在的房间全捞出来
+	// 内连接查询，继承软删除规则，一次性获取用户所有群聊
 	err := r.db.Model(&models.Room{}).
 		Select("rooms.*").
 		Joins("INNER JOIN room_members ON rooms.id = room_members.room_id").
@@ -65,10 +65,10 @@ func (r *roomRepoImpl) GetJoinedRooms(userID int64) ([]*models.Room, error) {
 	return rooms, err
 }
 
-// GetRoomByExactName 防爬虫精确搜索机制
+// GetRoomByExactName 根据群聊名称精确查询群聊
 func (r *roomRepoImpl) GetRoomByExactName(exactName string) (*models.Room, error) {
 	var room models.Room
-	// 严苛要求：坚决不用 LIKE，强迫走普通索引或唯一索引进行精确等值查询
+	// 采用等值查询，使用索引提升查询效率，不使用模糊查询
 	err := r.db.Where("name = ?", exactName).First(&room).Error
 	return &room, err
 }

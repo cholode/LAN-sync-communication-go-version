@@ -7,62 +7,61 @@ import (
 	"strings"
 
 	"github.com/gin-gonic/gin"
-	// "lan-im-go/pkg" // JWT 解析工具包
 )
 
+// JWTAuth JWT身份验证中间件
 func JWTAuth() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var tokenString string
-		// 1. 尝试从标准 HTTP 的 Authorization Header 中获取
-		log.Printf("[JWT 防线] 收到请求: %s %s", c.Request.Method, c.Request.URL.String())
+		// 1. 从标准HTTP请求头中获取Token
+		log.Printf("[JWT认证] 收到请求: %s %s", c.Request.Method, c.Request.URL.String())
 		authHeader := c.GetHeader("Authorization")
 		if authHeader != "" {
-			log.Printf("")
 			parts := strings.SplitN(authHeader, " ", 2)
 			if len(parts) == 2 && parts[0] == "Bearer" {
-
 				tokenString = parts[1]
-				log.Printf("token提取成功")
+				log.Printf("从请求头提取Token成功")
 			} else {
-				c.JSON(http.StatusUnauthorized, gin.H{"error": "Header 中的 Token 格式错误"})
+				c.JSON(http.StatusUnauthorized, gin.H{"error": "请求头Token格式非法"})
 				c.Abort()
 				return
 			}
 		} else {
-
-			// 2. 尝试从 URL Query 参数中获取 (专为 WebSocket 握手开启的绿色通道！)
+			// 2. 从URL参数中获取Token（兼容WebSocket握手）
 			tokenString = c.Query("token")
-			log.Printf("成功从query提取token")
+			log.Printf("从URL参数提取Token成功")
 		}
 
-		// 3. 终极判决：如果两个地方都没有，直接击毙
+		// 3. 校验Token是否存在
 		if tokenString == "" {
-			log.Printf("token为空")
-
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "拒绝访问：缺失 Token 凭证"})
+			log.Printf("Token凭证为空")
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "未提供Token凭证，访问被拒绝"})
 			c.Abort()
 			return
 		}
 
 		claims, err := pkg.ParseToken(tokenString)
 		if err != nil {
-			log.Printf("Token解析错误\n")
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "Token解析错误"})
+			log.Printf("Token解析失败\n")
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "Token解析失败"})
+			c.Abort()
+			return
 		}
 
 		c.Set("user_id", claims.UserID)
-
+		c.Set("user_role", claims.Role)
 		c.Next()
 	}
 }
 
-// SuperAdminOnly B端超管专属拦截器 (必须接在 JWTAuth 之后使用)
+// SuperAdminOnly 超级管理员权限校验中间件
+// 依赖JWTAuth中间件，需在其后使用
 func SuperAdminOnly() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		// 由于它接在 JWTAuth 后面，这里一定能拿到 role
-		role, exists := c.Get("role")
+		// 从上下文获取用户权限
+		role, exists := c.Get("user_role")
 		if !exists || role.(int8) != 1 {
-			c.JSON(http.StatusForbidden, gin.H{"error": "越权访问：仅超级管理员可执行此操作"})
+			c.JSON(http.StatusForbidden, gin.H{"error": "权限不足，仅超级管理员可访问"})
 			c.Abort()
 			return
 		}

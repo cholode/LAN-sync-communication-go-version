@@ -6,36 +6,36 @@ import (
 
 	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
-	"lan-im-go/models" // 导入你的图纸
+	"lan-im-go/models" // 导入数据模型
 )
 
-// DB 全局数据库实例指针 (在整个应用生命周期内复用)
+// DB 全局数据库实例，应用全局复用
 var DB *gorm.DB
 
-// InitDatabase 负责初始化数据库引擎并完成建表
+// InitDatabase 初始化数据库引擎，自动同步表结构
 func InitDatabase(dsn string) {
 	var err error
-	// 1. 建立物理连接
+	// 1. 创建数据库连接
 	DB, err = gorm.Open(mysql.Open(dsn), &gorm.Config{
-		// 细节：在生产环境中通常会关闭 GORM 的默认控制台 SQL 打印，或者重定向到日志库
+		// 生产环境可关闭SQL日志输出
 		// Logger: logger.Default.LogMode(logger.Silent),
 	})
 	if err != nil {
-		log.Fatalf("[致命错误] MySQL 连接失败，请检查 DSN 配置: %v", err)
+		log.Fatalf("[错误] MySQL 连接失败，请检查DSN配置: %v", err)
 	}
 
-	// 2. 考点：配置底层 SQL 连接池
-	// 很多新手不写这段代码，导致高并发时连接数打满，数据库直接拒绝服务
+	// 2. 配置数据库连接池参数
+	// 连接池配置可避免高并发场景下数据库连接耗尽
 	sqlDB, err := DB.DB()
 	if err != nil {
-		log.Fatalf("[致命错误] 获取底层 sql.DB 失败: %v", err)
+		log.Fatalf("[错误] 获取底层数据库连接失败: %v", err)
 	}
-	sqlDB.SetMaxIdleConns(10)           // 空闲连接池中连接的最大数量
-	sqlDB.SetMaxOpenConns(100)          // 打开数据库连接的最大数量
-	sqlDB.SetConnMaxLifetime(time.Hour) // 连接可复用的最大时间
+	sqlDB.SetMaxIdleConns(10)           // 最大空闲连接数
+	sqlDB.SetMaxOpenConns(100)          // 最大打开连接数
+	sqlDB.SetConnMaxLifetime(time.Hour) // 连接最大复用时间
 
-	// 3. 真正建表的地方！将图纸翻译成 MySQL 物理表
-	log.Println("正在同步数据库表结构...")
+	// 3. 自动同步数据模型至数据库表结构
+	log.Println("开始同步数据库表结构...")
 	err = DB.AutoMigrate(
 		&models.User{},
 		&models.Room{},
@@ -43,8 +43,8 @@ func InitDatabase(dsn string) {
 		&models.Message{},
 	)
 	if err != nil {
-		log.Fatalf("[致命错误] 数据库表结构同步 (AutoMigrate) 失败: %v", err)
+		log.Fatalf("[错误] 数据库表结构同步失败: %v", err)
 	}
 
-	log.Println("MySQL 连接成功，表结构同步完毕，连接池已配置！")
+	log.Println("MySQL 连接成功，表结构同步完成，连接池配置生效！")
 }

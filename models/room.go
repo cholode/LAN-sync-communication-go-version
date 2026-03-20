@@ -24,6 +24,6 @@ type RoomMember struct {
 	UserID   int64     `gorm:"type:bigint;not null;uniqueIndex:idx_room_user;comment:'用户ID'"`
 	Role     int8      `gorm:"type:tinyint;default:1;comment:'1:普通成员 2:管理员 3:群主'"`
 	JoinedAt time.Time `gorm:"autoCreateTime;comment:'加入时间'"`
-	// 面试防坑警告：绝对不要在这里写 GORM 的 foreignKey 约束标签！
+	// 绝对不要在这里写 GORM 的 foreignKey 约束标签！
 	// 工业级高并发系统全靠逻辑外键，物理外键造成的死锁和级联扫描是性能灾难。
 }

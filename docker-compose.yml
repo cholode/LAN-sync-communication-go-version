@@ -1,62 +1,62 @@
 version: '3.8'
 
-# 定义全局自定义网络，提供隔离的 DNS 解析环境
+# 定义自定义网络，实现服务隔离与内部DNS解析
 networks:
   lan-im-network:
     driver: bridge
 
-# 定义具名数据卷，防止数据库重启丢失数据
+# 定义数据卷，持久化存储MySQL数据，避免容器重启数据丢失
 volumes:
   mysql_data:
 
 services:
-  # 1. 数据库层
+  # 数据库服务
   db:
     image: mysql:8.0
     container_name: im-mysql
     restart: unless-stopped
-    # 密码绝不硬编码在 yaml 中，必须通过 .env 文件注入
+    # 环境变量通过.env文件注入，避免敏感信息硬编码
     environment:
       MYSQL_ROOT_PASSWORD:  ${DB_PASSWORD}
       MYSQL_DATABASE:  ${DB_NAME}
     ports:
-      - "3307:3306" # 本地开发需要暴露端口以便用 Navicat/DataGrip 连接
+      - "3307:3306" # 开发环境暴露端口，用于数据库客户端连接
    
     #command: --default-authentication-plugin=mysql_native_password    #调试
     volumes:
       - mysql_data:/var/lib/mysql
-      # 挂载初始化脚本，第一次启动时自动执行（可选，配合 GORM 自动迁移）
+      # 挂载初始化脚本，容器首次启动时自动执行
       - ./deploy/mysql/init.sql:/docker-entrypoint-initdb.d/init.sql
     networks:
       - lan-im-network
-    # 面试加分项：健康检查。确保 MySQL 真正 Ready 后，再放行依赖它的服务
+    # 健康检查配置，确保数据库服务正常运行后再启动依赖服务
     healthcheck:
       test: [ "CMD", "mysqladmin", "ping", "-h", "localhost" ]
       timeout: 10s
       retries: 5
       start_period: 30s
 
-  # 2. 核心业务层 (Go 后端)
+  # 后端服务（Go应用）
   backend:
     build:
       context: .
-      dockerfile: deploy/Dockerfile.dev # 开发环境推荐使用带 Air 的热重载镜像
+      dockerfile: deploy/Dockerfile.dev # 开发环境使用支持热重载的镜像
     container_name: im-backend
     restart: unless-stopped
     environment:
       - DB_DSN=root:${DB_PASSWORD}@tcp(db:3306)/${DB_NAME}?charset=utf8mb4&parseTime=True&loc=Local
-    # 严苛标准：Go 容器绝不直接对外暴露端口！全部由 Nginx 代理
+    # 生产环境建议通过Nginx代理，不直接暴露端口
     ports:
       - "8080:8080"
     volumes:
-      - .:/app # 挂载当前源码目录，配合 Air 实现代码修改即时生效
+      - .:/app # 挂载源码目录，实现代码热更新
     networks:
       - lan-im-network
     depends_on:
       db:
-        condition: service_healthy # 强依赖：必须等 MySQL 健康检查通过后才启动 Go
+        condition: service_healthy # 等待数据库健康检查通过后启动
 
-  # 3. 接入与网关层 (Nginx)
+  # 网关服务（Nginx）
   # nginx:
   #   image: nginx:alpine
   #   container_name: im-nginx
@@ -65,13 +65,13 @@ services:
   #     - "80:80"
   #     - "443:443"
   #   volumes:
-  #     # 挂载核心配置文件
+  #     # 挂载核心配置文件（只读）
   #     - ./deploy/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
-  #     # 挂载你用 mkcert 生成的本地 HTTPS 证书
+  #     # 挂载HTTPS证书（只读）
   #     - ./deploy/certs:/etc/nginx/certs:ro
-  #     # 挂载前端静态文件目录 (动静分离)
+  #     # 挂载前端静态资源（动静分离）
   #     - ./frontend/dist:/usr/share/nginx/html:ro
-  #     # 挂载大文件上传目录 (供 Nginx 直接零拷贝下发)
+  #     # 挂载文件上传目录（只读）
   #     - ./data/uploads:/var/www/uploads:ro
   #   networks:
   #     - lan-im-network
