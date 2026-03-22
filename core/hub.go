@@ -2,10 +2,11 @@ package core
 
 import (
 	"encoding/json"
-	"github.com/bwmarrin/snowflake"
 	"lan-im-go/models"
 	"lan-im-go/repository"
 	"log"
+
+	"github.com/bwmarrin/snowflake"
 )
 
 type RoomAction struct {
@@ -97,9 +98,9 @@ func (h *Hub) Run() {
 			if clients, ok := h.rooms[msg.RoomID]; ok {
 				for client := range clients {
 					// 跳过消息发送者，避免重复接收
-					if client.UserID == msg.SenderID {
-						continue
-					}
+					// if client.UserID == msg.SenderID {    #测试
+					// 	continue
+					// }
 					select {
 					case client.Send <- payload:
 					default:

@@ -19,9 +19,9 @@ type Room struct {
 
 // RoomMember 房间成员关系表 (替代传统的好友关系表和群成员表)
 type RoomMember struct {
-	ID       int64     `gorm:"primaryKey;autoIncrement"`
-	RoomID   int64     `gorm:"type:bigint;not null;uniqueIndex:idx_room_user;comment:'房间ID'"`
-	UserID   int64     `gorm:"type:bigint;not null;uniqueIndex:idx_room_user;comment:'用户ID'"`
+	ID       int64     `gorm:"primaryKey;autoIncrement:false;index:idx_room_id_id,priority:2;comment:'雪花算法MsgID'"`
+	RoomID   int64     `gorm:"type:bigint;not null;uniqueIndex:idx_room_user,priority:1;comment:'房间ID'"`
+	UserID   int64     `gorm:"type:bigint;not null;uniqueIndex:idx_room_user,priority:2;inx_user_id;comment:'用户ID'"`
 	Role     int8      `gorm:"type:tinyint;default:1;comment:'1:普通成员 2:管理员 3:群主'"`
 	JoinedAt time.Time `gorm:"autoCreateTime;comment:'加入时间'"`
 	// 绝对不要在这里写 GORM 的 foreignKey 约束标签！

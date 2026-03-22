@@ -1,79 +1,94 @@
-version: '3.8'
 
-# 定义自定义网络，实现服务隔离与内部DNS解析
+
 networks:
   lan-im-network:
     driver: bridge
 
-# 定义数据卷，持久化存储MySQL数据，避免容器重启数据丢失
 volumes:
   mysql_data:
 
 services:
-  # 数据库服务
   db:
     image: mysql:8.0
     container_name: im-mysql
     restart: unless-stopped
-    # 环境变量通过.env文件注入，避免敏感信息硬编码
-    environment:
-      MYSQL_ROOT_PASSWORD:  ${DB_PASSWORD}
-      MYSQL_DATABASE:  ${DB_NAME}
-    ports:
-      - "3307:3306" # 开发环境暴露端口，用于数据库客户端连接
-   
-    #command: --default-authentication-plugin=mysql_native_password    #调试
-    volumes:
-      - mysql_data:/var/lib/mysql
-      # 挂载初始化脚本，容器首次启动时自动执行
-      - ./deploy/mysql/init.sql:/docker-entrypoint-initdb.d/init.sql
+    #network_mode: "host"
     networks:
       - lan-im-network
-    # 健康检查配置，确保数据库服务正常运行后再启动依赖服务
+    ports:
+      - "3306:3306"
+    deploy:
+      resources:
+        limits:
+          cpus: '4.0'
+          memory: 4G
+        reservations:
+          cpus: '0.5'
+          memory: 1G
+    environment:
+      MYSQL_ROOT_PASSWORD: ${DB_PASSWORD}
+      MYSQL_DATABASE: ${DB_NAME}
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./deploy/mysql/init.sql:/docker-entrypoint-initdb.d/init.sql
     healthcheck:
-      test: [ "CMD", "mysqladmin", "ping", "-h", "localhost" ]
+      # 强制使用 127.0.0.1 走 TCP 协议探活，规避 Unix Socket 陷阱
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
       timeout: 10s
       retries: 5
       start_period: 30s
 
-  # 后端服务（Go应用）
   backend:
     build:
       context: .
-      dockerfile: deploy/Dockerfile.dev # 开发环境使用支持热重载的镜像
+      dockerfile: Dockerfile.dev
     container_name: im-backend
     restart: unless-stopped
-    environment:
-      - DB_DSN=root:${DB_PASSWORD}@tcp(db:3306)/${DB_NAME}?charset=utf8mb4&parseTime=True&loc=Local
-    # 生产环境建议通过Nginx代理，不直接暴露端口
-    ports:
-      - "8080:8080"
-    volumes:
-      - .:/app # 挂载源码目录，实现代码热更新
+    #network_mode: "host"
     networks:
       - lan-im-network
+    ports:
+     - "8080:8080"
+    environment:
+      # 修复语法错误：彻底删除无效的 db: 前缀
+      - DB_DSN=root:${DB_PASSWORD}@tcp(db:3306)/${DB_NAME}?charset=utf8mb4&parseTime=True&loc=Local
+    deploy:
+      resources:
+        limits:
+          cpus: '4.0'
+          memory: 8G
+        reservations:
+          cpus: '0.5'
+          memory: 1G
+    volumes:
+      - ./data_storage:/app/data
     depends_on:
       db:
-        condition: service_healthy # 等待数据库健康检查通过后启动
+        condition: service_healthy
+    ulimits:
+      nofile:
+        soft: 65535
+        hard: 65535
 
-  # 网关服务（Nginx）
-  # nginx:
-  #   image: nginx:alpine
-  #   container_name: im-nginx
-  #   restart: unless-stopped
-  #   ports:
-  #     - "80:80"
-  #     - "443:443"
-  #   volumes:
-  #     # 挂载核心配置文件（只读）
-  #     - ./deploy/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
-  #     # 挂载HTTPS证书（只读）
-  #     - ./deploy/certs:/etc/nginx/certs:ro
-  #     # 挂载前端静态资源（动静分离）
-  #     - ./frontend/dist:/usr/share/nginx/html:ro
-  #     # 挂载文件上传目录（只读）
-  #     - ./data/uploads:/var/www/uploads:ro
-  #   networks:
-  #     - lan-im-network
-  #   depends_on:
-  #     - backend
+  nginx:
+    image: nginx:alpine
+    container_name: im-nginx
+    restart: unless-stopped
+    #network_mode: "host"
+    networks:
+      - lan-im-network
+    ports:
+      - "80:80"
+      - "443:443"
+
+    volumes:
+      - ./deploy/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./deploy/certs:/etc/nginx/certs:ro
+      - ./frontend:/usr/share/nginx/html:ro
+      - ./data/uploads:/var/www/uploads:ro
+    ulimits:
+      nofile:
+        soft: 65535
+        hard: 65535
+    depends_on:
+      - backend

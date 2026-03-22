@@ -6,7 +6,7 @@ import (
 
 	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
-	"lan-im-go/models" // 导入数据模型
+	//"lan-im-go/models" // 导入数据模型
 )
 
 // DB 全局数据库实例，应用全局复用
@@ -35,16 +35,16 @@ func InitDatabase(dsn string) {
 	sqlDB.SetConnMaxLifetime(time.Hour) // 连接最大复用时间
 
 	// 3. 自动同步数据模型至数据库表结构
-	log.Println("开始同步数据库表结构...")
-	err = DB.AutoMigrate(
-		&models.User{},
-		&models.Room{},
-		&models.RoomMember{},
-		&models.Message{},
-	)
-	if err != nil {
-		log.Fatalf("[错误] 数据库表结构同步失败: %v", err)
-	}
+	// log.Println("开始同步数据库表结构...")
+	// err = DB.AutoMigrate(
+	// 	&models.User{},
+	// 	&models.Room{},
+	// 	&models.RoomMember{},
+	// 	&models.Message{},
+	// )
+	// if err != nil {
+	// 	log.Fatalf("[错误] 数据库表结构同步失败: %v", err)
+	// }
 
 	log.Println("MySQL 连接成功，表结构同步完成，连接池配置生效！")
 }

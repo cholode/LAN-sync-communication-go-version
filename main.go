@@ -1,28 +1,30 @@
 package main
 
 import (
-	"log"
-	"os"
-
+	"github.com/gin-contrib/cors"
+	"github.com/gin-contrib/pprof"
+	"github.com/gin-gonic/gin"
+	"io"
 	"lan-im-go/api"
 	"lan-im-go/core"
 	"lan-im-go/infrastructure"
 	"lan-im-go/middleware"
 	"lan-im-go/repository"
+	"log"
+	"os"
 	"time"
-
-	"github.com/gin-contrib/cors"
-	"github.com/gin-gonic/gin"
 )
 
 func main() {
+
+	log.SetOutput(io.Discard)
 	// ========================================================================
 	// 阶段1：环境与基础设施初始化
 	// ========================================================================
 	// 从环境变量读取数据库配置，为空时使用本地默认配置（适配本地调试）
 	dsn := os.Getenv("DB_DSN")
 	if dsn == "" {
-		dsn = "root:123456@tcp(127.0.0.1:3307)/lan_im?charset=utf8mb4&parseTime=True&loc=Local"
+		dsn = "root:123456@tcp(127.0.0.1:3306)/lan_im?charset=utf8mb4&parseTime=True&loc=Local"
 		log.Println("[警告] 未检测到DB_DSN环境变量，使用本地默认配置连接MySQL")
 	}
 
@@ -51,8 +53,11 @@ func main() {
 	// 阶段4：HTTP服务与路由配置
 	// ========================================================================
 	// 开发环境使用默认模式，生产环境建议切换为发布模式
-	r := gin.Default()
-
+	//r := gin.Default()
+	gin.SetMode(gin.ReleaseMode)
+	r := gin.New()
+	r.Use(gin.Recovery())
+	pprof.Register(r)
 	// ========================================================================
 	// 跨域配置（需在路由注册前配置）
 	// ========================================================================

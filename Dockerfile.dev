@@ -2,7 +2,7 @@
 # 第一阶段：构建阶段
 # ==========================================
 # 规范1：指定固定基础镜像版本，保证构建环境一致性
-FROM golang:1.21-alpine AS builder
+FROM golang:1.26-alpine AS builder
 
 # 规范2：配置Go编译环境变量，启用Go Modules并配置国内代理
 ENV GO111MODULE=on \
@@ -46,11 +46,16 @@ WORKDIR /app
 COPY --from=builder /build/im-server /app/
 
 # 安全规范：使用非root用户运行服务，降低容器安全风险
-RUN adduser -S -D -H -h /app nobody
-USER nobody
+RUN adduser -S -D -H -h /app imuser
+
+RUN mkdir -p /app/data/uploads /app/data/temp_chunks && \
+    chown -R imuser:nobody /app && \
+    chmod +x /app/im-server
+
+USER imuser
 
 # 声明服务端口
 EXPOSE 8080
 
 # 启动服务
-CMD ["./im-server"]
+CMD ["/app/im-server"]
