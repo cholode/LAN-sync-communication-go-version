@@ -71,7 +71,10 @@ services:
         hard: 65535
 
   nginx:
-    image: nginx:alpine
+    build:
+      context: .
+      dockerfile: Dockerfile.nginx
+    #image: nginx:alpine
     container_name: im-nginx
     restart: unless-stopped
     #network_mode: "host"
@@ -82,8 +85,8 @@ services:
       - "443:443"
 
     volumes:
-      - ./deploy/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
-      - ./deploy/certs:/etc/nginx/certs:ro
+      # - ./deploy/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      # - ./deploy/certs:/etc/nginx/certs:ro
       - ./frontend:/usr/share/nginx/html:ro
       - ./data/uploads:/var/www/uploads:ro
     ulimits:

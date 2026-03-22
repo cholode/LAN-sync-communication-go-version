@@ -57,5 +57,7 @@ USER imuser
 # 声明服务端口
 EXPOSE 8080
 
+RUN 
+
 # 启动服务
 CMD ["/app/im-server"]

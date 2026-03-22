@@ -30,6 +30,11 @@ func (r *messageRepoImpl) GetHistoryByCursor(roomID int64, cursorMsgID int64, li
 	}
 	// 3. 按消息ID倒序查询，匹配数据库索引，提升查询效率
 	err := query.Order("id DESC").Limit(limit).Find(&messages).Error
+
+	for i, j := 0, len(messages)-1; i < j; i, j = i+1, j-1 {
+		messages[i], messages[j] = messages[j], messages[i]
+	}
+
 	return messages, err
 }
 
