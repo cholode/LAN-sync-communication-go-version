@@ -4,7 +4,7 @@ import (
 	"github.com/gin-contrib/cors"
 	"github.com/gin-contrib/pprof"
 	"github.com/gin-gonic/gin"
-	"io"
+	//"io"
 	"lan-im-go/api"
 	"lan-im-go/core"
 	"lan-im-go/infrastructure"
@@ -17,7 +17,7 @@ import (
 
 func main() {
 
-	log.SetOutput(io.Discard)
+	//log.SetOutput(io.Discard)
 	// ========================================================================
 	// 阶段1：环境与基础设施初始化
 	// ========================================================================

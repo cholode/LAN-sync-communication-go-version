@@ -23,6 +23,10 @@ func InitFileDirs() {
 	os.MkdirAll(TempChunkDir, 0755)
 }
 
+func InitUserDir(UserID int) {
+	os.MkdirAll(fmt.Sprintf("./data/temp_chunks/%s", strconv.Itoa(UserID)), 0755)
+}
+
 // CheckUploadStatus 断点续传-文件状态校验（秒传检测）
 // 前端上传文件前调用，校验文件是否已存在/已上传分片
 func CheckUploadStatus(c *gin.Context) {
