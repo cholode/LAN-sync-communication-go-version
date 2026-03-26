@@ -1,0 +1,9 @@
+[mysqld]
+# 物理连接数扩容，抵抗万级并发登录的瞬间击穿
+max_connections = 2000
+# 增大 InnoDB 缓冲池，让更多数据驻留在物理内存中而不是频繁刷盘（根据你机器的物理内存酌情分配，例如 1G 或 2G）
+innodb_buffer_pool_size = 1G
+# 调整超时时间，防止压测时的长连接被 MySQL 提前物理斩断
+wait_timeout = 3600
+interactive_timeout = 3600
+innodb_flush_log_at_trx_commit = 2

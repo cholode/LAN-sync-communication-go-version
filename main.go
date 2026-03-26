@@ -4,20 +4,29 @@ import (
 	"github.com/gin-contrib/cors"
 	"github.com/gin-contrib/pprof"
 	"github.com/gin-gonic/gin"
-	//"io"
+	"io"
 	"lan-im-go/api"
 	"lan-im-go/core"
 	"lan-im-go/infrastructure"
 	"lan-im-go/middleware"
 	"lan-im-go/repository"
 	"log"
+	"net/http"
 	"os"
 	"time"
 )
 
 func main() {
 
-	//log.SetOutput(io.Discard)
+	//  单独启动一个 goroutine 监听 6060 端口（不影响主业务）
+	go func() {
+		// 地址：0.0.0.0:6060 允许外部/宿主机访问
+		err := http.ListenAndServe("0.0.0.0:6060", nil)
+		if err != nil {
+			panic("pprof start failed: " + err.Error())
+		}
+	}()
+	log.SetOutput(io.Discard)
 	// ========================================================================
 	// 阶段1：环境与基础设施初始化
 	// ========================================================================

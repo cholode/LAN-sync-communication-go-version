@@ -22,7 +22,7 @@ func (r *userRepoImpl) CreateUser(user *models.User) error {
 
 func (r *userRepoImpl) GetByUsername(username string) (*models.User, error) {
 	var user models.User
-	err := r.db.Where("username = ?", username).First(&user).Error
+	err := r.db.Where("username = ?", username).Take(&user).Error
 	if err != nil {
 		return nil, err
 	}
@@ -31,7 +31,7 @@ func (r *userRepoImpl) GetByUsername(username string) (*models.User, error) {
 
 func (r *userRepoImpl) GetByID(id int64) (*models.User, error) {
 	var user models.User
-	err := r.db.First(&user, id).Error
+	err := r.db.Take(&user, id).Error
 	if err != nil {
 		return nil, err
 	}

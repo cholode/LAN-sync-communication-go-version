@@ -69,6 +69,6 @@ func (r *roomRepoImpl) GetJoinedRooms(userID int64) ([]*models.Room, error) {
 func (r *roomRepoImpl) GetRoomByExactName(exactName string) (*models.Room, error) {
 	var room models.Room
 	// 采用等值查询，使用索引提升查询效率，不使用模糊查询
-	err := r.db.Where("name = ?", exactName).First(&room).Error
+	err := r.db.Where("name = ?", exactName).Take(&room).Error
 	return &room, err
 }

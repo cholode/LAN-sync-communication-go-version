@@ -50,6 +50,8 @@ type RoomMemberRepository interface {
 type MessageRepository interface {
 	// 异步保存消息
 	SaveMessage(msg *models.Message) error
+
+	SaveMessageBatch(msgs []*models.Message) error
 	// 基于游标分页查询历史消息，避免深分页性能问题
 	GetHistoryByCursor(roomID int64, cursorMsgID int64, limit int) ([]*models.Message, error)
 	// 批量软删除指定用户在群组内的消息

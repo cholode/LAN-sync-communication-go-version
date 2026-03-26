@@ -1,15 +1,15 @@
 package api
 
 import (
-	//"encoding/json"
+	"encoding/json"
 	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
 	"lan-im-go/core"
-	//"lan-im-go/models"
+	"lan-im-go/models"
 	"lan-im-go/repository"
 	"log"
 	"net/http"
-	//"time"
+	"time"
 )
 
 // WebSocket协议升级器
@@ -58,7 +58,7 @@ func WsEndpoint(hub *core.Hub) gin.HandlerFunc {
 			Hub:    hub,
 			UserID: realUserID,
 			Conn:   conn,
-			Send:   make(chan []byte, 256), // 缓冲通道，防止高并发阻塞
+			Send:   make(chan []byte, 1024), // 缓冲通道，防止高并发阻塞
 		}
 
 		// 构建订阅信息，注册客户端到Hub
@@ -81,34 +81,34 @@ func WsEndpoint(hub *core.Hub) gin.HandlerFunc {
 
 		// 消息读取循环：监听前端发送的消息
 		for {
-			// _, rawMsg, err := conn.ReadMessage()
-			// if err != nil {
-			// 	// 连接异常断开，退出循环
-			// 	break
-			// }
+			_, rawMsg, err := conn.ReadMessage()
+			if err != nil {
+				// 连接异常断开，退出循环
+				break
+			}
 
-			// // 解析消息数据
-			// var payload struct {
-			// 	RoomID  int64  `json:"room_id"`
-			// 	Content string `json:"content"`
-			// }
-			// if err := json.Unmarshal(rawMsg, &payload); err != nil {
-			// 	log.Printf("[WebSocket] 消息格式解析失败: %v", err)
-			// 	continue
-			// }
+			// 解析消息数据
+			var payload struct {
+				RoomID  int64  `json:"room_id"`
+				Content string `json:"content"`
+			}
+			if err := json.Unmarshal(rawMsg, &payload); err != nil {
+				log.Printf("[WebSocket] 消息格式解析失败: %v", err)
+				continue
+			}
 
-			// // 构建消息实体，用户ID从上下文获取，禁止前端传入
-			// msg := &models.Message{
-			// 	RoomID:    payload.RoomID,
-			// 	SenderID:  realUserID,
-			// 	Content:   payload.Content,
-			// 	CreatedAt: time.Now(),
-			// 	Type:      1,
-			// }
+			// 构建消息实体，用户ID从上下文获取，禁止前端传入
+			msg := &models.Message{
+				RoomID:    payload.RoomID,
+				SenderID:  realUserID,
+				Content:   payload.Content,
+				CreatedAt: time.Now(),
+				Type:      1,
+			}
 
-			// // 将消息发送至Hub，由Hub统一广播至群内所有在线用户
-			// hub.Broadcast <- msg
-			// log.Printf("[消息中心] 用户%d向群聊%d发送消息，已完成广播", realUserID, payload.RoomID)
+			// 将消息发送至Hub，由Hub统一广播至群内所有在线用户
+			hub.Broadcast <- msg
+			log.Printf("[消息中心] 用户%d向群聊%d发送消息，已完成广播", realUserID, payload.RoomID)
 		}
 	}
 }

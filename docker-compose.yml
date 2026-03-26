@@ -31,6 +31,7 @@ services:
     volumes:
       - mysql_data:/var/lib/mysql
       - ./deploy/mysql/init.sql:/docker-entrypoint-initdb.d/init.sql
+      - ./mysql-custom.cnf:/etc/mysql/conf.d/custom.cnf:ro
     healthcheck:
       # 强制使用 127.0.0.1 走 TCP 协议探活，规避 Unix Socket 陷阱
       test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
@@ -49,6 +50,7 @@ services:
       - lan-im-network
     ports:
      - "8080:8080"
+     - "6060:6060"
     environment:
       # 修复语法错误：彻底删除无效的 db: 前缀
       - DB_DSN=root:${DB_PASSWORD}@tcp(db:3306)/${DB_NAME}?charset=utf8mb4&parseTime=True&loc=Local

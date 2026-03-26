@@ -18,6 +18,15 @@ func (r *messageRepoImpl) SaveMessage(msg *models.Message) error {
 	return r.db.Create(msg).Error
 }
 
+// 批量保存消息（高性能写入）
+func (r *messageRepoImpl) SaveMessageBatch(msgs []*models.Message) error {
+	if len(msgs) == 0 {
+		return nil
+	}
+	// gorm 批量插入，只执行一条SQL
+	return r.db.CreateInBatches(msgs, 100).Error
+}
+
 // GetHistoryByCursor 基于游标分页查询历史消息
 func (r *messageRepoImpl) GetHistoryByCursor(roomID int64, cursorMsgID int64, limit int) ([]*models.Message, error) {
 	var messages []*models.Message

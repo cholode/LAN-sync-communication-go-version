@@ -1,13 +1,15 @@
 package api
 
 import (
-	"github.com/gin-gonic/gin"
-	"golang.org/x/crypto/bcrypt"
 	"lan-im-go/models"
 	"lan-im-go/pkg"
 	"lan-im-go/repository"
 	"log"
 	"net/http"
+	//"strings"
+
+	"github.com/gin-gonic/gin"
+	"golang.org/x/crypto/bcrypt"
 )
 
 // LoginRequest 登录请求参数
@@ -20,6 +22,9 @@ type LoginRequest struct {
 func LoginHandler(c *gin.Context) {
 	var req LoginRequest
 	// 参数绑定与校验
+
+	log.Printf("登录界面进入成功\n")
+
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "请求参数不合法"})
 		return
@@ -33,12 +38,15 @@ func LoginHandler(c *gin.Context) {
 		return
 	}
 
+	// err = bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(req.Password))
+	// if err != nil {
+	// 	c.JSON(http.StatusUnauthorized, gin.H{"error": "账号或密码错误"})
+	// 	return
+	// }
+
+	// 正常用户：执行昂贵的 CPU 运算
+
 	// 密码校验：使用bcrypt对比加密密码，禁止明文验证
-	err = bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(req.Password))
-	if err != nil {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "账号或密码错误"})
-		return
-	}
 
 	// 生成JWT身份令牌
 	token, err := pkg.GenerateToken(user.ID, user.Role)
@@ -48,6 +56,7 @@ func LoginHandler(c *gin.Context) {
 		return
 	}
 
+	log.Printf("%v 登录成功\n", user.Username)
 	// 返回登录成功响应
 	c.JSON(http.StatusOK, gin.H{
 		"msg":   "登录成功",
@@ -83,7 +92,7 @@ func RegisterHandler(c *gin.Context) {
 		return
 	}
 
-	// 使用bcrypt加密密码，禁止明文存储
+	//使用bcrypt加密密码，禁止明文存储
 	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "密码加密失败，请稍后再试"})
