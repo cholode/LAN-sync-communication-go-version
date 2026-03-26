@@ -41,8 +41,7 @@ docker compose up -d --build
 ```
 
 # 测试结果
-
-500人群聊每人每秒发一次消息
+### 500人群聊每人每秒发一次消息
 
 ```
 CONTAINER ID   NAME         CPU %     MEM USAGE / LIMIT     MEM %     NET I/O           BLOCK I/O         PIDS    
@@ -93,35 +92,68 @@ e3f5b4a7225b   im-backend   90.43%    1.622GiB / 8GiB       20.28%    941MB / 4.
 ```
 
 ```
-█ TOTAL RESULTS
+ █ TOTAL RESULTS
 
     CUSTOM
-    custom_http_req_failed.........: 11186    14.126682/s
-    custom_online_user_count.......: 1        min=-1             max=1
-    custom_ws_connect_success......: 11230    14.182249/s
-    custom_ws_msg_sent_total.......: 377917   477.267413/s
+    custom_online_user_count.......: 1        min=1          max=1
+    custom_ws_connect_success......: 10000    11.741046/s
+    custom_ws_msg_sent_total.......: 359000   421.503557/s
 
     HTTP
-    http_req_duration..............: avg=20.24ms min=0s      med=5.2ms    max=1.15s    p(90)=45.87ms p(95)=85.78m 
-      { expected_response:true }...: avg=17.62ms min=511.4µs med=6.19ms   max=592.59ms p(90)=21.37ms p(95)=77.46m 
-    http_req_failed................: 32.11%   11187 out of 34838
-    http_reqs......................: 34838    43.996545/s
+    http_req_duration..............: avg=5.11ms  min=508.1µs med=5.13ms  max=67.02ms  p(90)=8.38ms  p(95)=9.48ms  
+      { expected_response:true }...: avg=5.11ms  min=508.1µs med=5.13ms  max=67.02ms  p(90)=8.38ms  p(95)=9.48ms  
+    http_req_failed................: 0.00%    1 out of 20102
+    http_reqs......................: 20102    23.601851/s
 
     EXECUTION
-    iteration_duration.............: avg=6m20s   min=1.04s   med=7m43s    max=11m15s   p(90)=10m33s  p(95)=10m54s 
-    iterations.....................: 14120    17.832/s
-    vus............................: 11       min=0              max=10000
-    vus_max........................: 10000    min=10000          max=10000
+    vus............................: 2        min=0          max=10000
+    vus_max........................: 10000    min=10000      max=10000
 
     NETWORK
-    data_received..................: 5.9 GB   7.4 MB/s
-    data_sent......................: 35 MB    44 kB/s
+    data_received..................: 8.7 GB   10 MB/s
+    data_sent......................: 35 MB    42 kB/s
 
     WEBSOCKET
-    ws_connecting..................: avg=4.98ms  min=0s      med=2.08ms   max=311.54ms p(90)=4.87ms  p(95)=11.27m 
-    ws_msgs_received...............: 19124955 24152.704949/s
-    ws_msgs_sent...................: 377917   477.267413/s
-    ws_ping........................: avg=12.79ms min=0s      med=511.29µs max=348.6ms  p(90)=54.26ms p(95)=96.99m 
-    ws_session_duration............: avg=8m35s   min=0s      med=8m44s    max=11m14s   p(90)=10m44s  p(95)=10m59s 
-    ws_sessions....................: 11471    14.486606/s
+    ws_connecting..................: avg=2.45ms  min=0s      med=2.09ms  max=15.6ms   p(90)=4.18ms  p(95)=4.43ms  
+    ws_msgs_received...............: 23190212 27227.734956/s
+    ws_msgs_sent...................: 359000   421.503557/s
+    ws_ping........................: avg=14.01ms min=0s      med=512.5µs max=425.17ms p(90)=59.75ms p(95)=107.69m 
+    ws_sessions....................: 10000    11.741046/s
+
+
+
+```
+
+### 5000人在线，500人活跃，1个群50人，5人活跃
+
+```
+
+  █ TOTAL RESULTS
+
+    CUSTOM
+    custom_online_user_count.......: 1        min=1             max=1
+    custom_ws_connect_success......: 5000     5.869372/s
+    custom_ws_msg_sent_total.......: 359000   421.420925/s
+
+    HTTP
+    http_req_duration..............: avg=6.29ms min=0s      med=2.67ms  max=75.46ms  p(90)=14.72ms p(95)=16.64ms  
+      { expected_response:true }...: avg=8.08ms min=0s      med=8.39ms  max=75.46ms  p(90)=15.61ms p(95)=18.22ms  
+    http_req_failed................: 33.11%   5001 out of 15102//注册失败导致的
+    http_reqs......................: 15102    17.727852/s
+
+    EXECUTION
+    vus............................: 2        min=0             max=5000
+    vus_max........................: 5000     min=5000          max=5000
+
+    NETWORK
+    data_received..................: 7.7 GB   9.1 MB/s
+    data_sent......................: 47 MB    55 kB/s
+
+    WEBSOCKET
+    ws_connecting..................: avg=1.92ms min=505.4µs med=1.76ms  max=9.85ms   p(90)=2.68ms  p(95)=2.91ms   
+    ws_msgs_received...............: 10957862 12863.154157/s
+    ws_msgs_sent...................: 359000   421.420925/s
+    ws_ping........................: avg=5.76ms min=0s      med=544.4µs max=240.53ms p(90)=1.75ms  p(95)=45.05ms  
+    ws_sessions....................: 5000     5.869372/s
+
 ```
