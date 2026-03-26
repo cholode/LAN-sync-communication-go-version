@@ -157,3 +157,42 @@ e3f5b4a7225b   im-backend   90.43%    1.622GiB / 8GiB       20.28%    941MB / 4.
     ws_sessions....................: 5000     5.869372/s
 
 ```
+
+### 万人在线，千人活跃，1个群100人，10人活跃（带crypt加密）
+
+```
+CONTAINER ID   NAME         CPU %     MEM USAGE / LIMIT   MEM %     NET I/O           BLOCK I/O         PIDS      
+d30fe5ff622a   im-mysql     4.00%     452.6MiB / 4GiB     11.05%    55.5MB / 98MB     106MB / 724MB     40        
+331a1c5ca6f5   im-backend   108.38%   1.297GiB / 8GiB     16.21%    1.55GB / 9.18GB   8.19kB / 0B       12        
+a88a458ac18c   im-nginx     0.00%     280MiB / 9.713GiB   2.82%     998B / 126B       1.73MB / 12.3kB   11   
+```
+
+```
+  █ TOTAL RESULTS
+
+    CUSTOM
+    custom_online_user_count.......: 1        min=1          max=1
+    custom_ws_connect_success......: 10000    11.739344/s
+    custom_ws_msg_sent_total.......: 359000   421.442433/s
+
+    HTTP
+    http_req_duration..............: avg=25.62ms min=2.58ms med=18.11ms  max=63.81ms  p(90)=44.96ms p(95)=45.41ms 
+      { expected_response:true }...: avg=25.62ms min=2.58ms med=18.12ms  max=63.81ms  p(90)=44.96ms p(95)=45.41ms 
+    http_req_failed................: 0.00%    1 out of 20102
+    http_reqs......................: 20102    23.598428/s
+
+    EXECUTION
+    vus............................: 12       min=0          max=10000
+    vus_max........................: 10000    min=10000      max=10000
+
+    NETWORK
+    data_received..................: 8.7 GB   10 MB/s
+    data_sent......................: 35 MB    42 kB/s
+
+    WEBSOCKET
+    ws_connecting..................: avg=2.25ms  min=0s     med=1.56ms   max=19.54ms  p(90)=4.38ms  p(95)=4.64ms  
+    ws_msgs_received...............: 21984353 25808.187262/s
+    ws_msgs_sent...................: 359000   421.442433/s
+    ws_ping........................: avg=14.12ms min=0s     med=508.29µs max=417.48ms p(90)=57.6ms  p(95)=109.83m 
+    ws_sessions....................: 10000    11.739344/s
+```

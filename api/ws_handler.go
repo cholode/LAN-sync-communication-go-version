@@ -58,7 +58,7 @@ func WsEndpoint(hub *core.Hub) gin.HandlerFunc {
 			Hub:    hub,
 			UserID: realUserID,
 			Conn:   conn,
-			Send:   make(chan []byte, 1024), // 缓冲通道，防止高并发阻塞
+			Send:   make(chan []byte, 256), // 缓冲通道，防止高并发阻塞
 		}
 
 		// 构建订阅信息，注册客户端到Hub

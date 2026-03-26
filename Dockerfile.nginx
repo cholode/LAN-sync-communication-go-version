@@ -5,11 +5,11 @@ RUN apk add --no-cache openssl
 # 在容器内部创建存放证书的绝对物理路径
 RUN mkdir -p /etc/nginx/certs
 
-# ！！！妥协性构建：在镜像编译阶段直接生成自签证书 ！！！
+# 妥协性构建：在镜像编译阶段直接生成自签证书
 RUN openssl req -x509 -nodes -days 3650 -newkey rsa:2048 \
     -keyout /etc/nginx/certs/lan-im.key \
     -out /etc/nginx/certs/lan-im.crt \
     -subj "/C=CN/ST=Beijing/L=Beijing/O=LanIM/CN=localhost"
 
-# 复制你的 Nginx 网关配置
+# 复制 Nginx 网关配置
 COPY ./deploy/nginx/nginx.conf /etc/nginx/nginx.conf

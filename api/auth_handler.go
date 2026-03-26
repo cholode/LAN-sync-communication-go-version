@@ -38,13 +38,11 @@ func LoginHandler(c *gin.Context) {
 		return
 	}
 
-	// err = bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(req.Password))
-	// if err != nil {
-	// 	c.JSON(http.StatusUnauthorized, gin.H{"error": "账号或密码错误"})
-	// 	return
-	// }
-
-	// 正常用户：执行昂贵的 CPU 运算
+	err = bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(req.Password))
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "账号或密码错误"})
+		return
+	}
 
 	// 密码校验：使用bcrypt对比加密密码，禁止明文验证
 
