@@ -4,7 +4,7 @@ import (
 	"github.com/gin-contrib/cors"
 	"github.com/gin-contrib/pprof"
 	"github.com/gin-gonic/gin"
-	"io"
+	//"io"
 	"lan-im-go/api"
 	"lan-im-go/core"
 	"lan-im-go/infrastructure"
@@ -26,7 +26,7 @@ func main() {
 			panic("pprof start failed: " + err.Error())
 		}
 	}()
-	log.SetOutput(io.Discard)
+	//log.SetOutput(io.Discard)
 	// ========================================================================
 	// 阶段1：环境与基础设施初始化
 	// ========================================================================
@@ -89,6 +89,8 @@ func main() {
 		// 开放接口：用户注册、登录
 		public.POST("/register", api.RegisterHandler)
 		public.POST("/login", api.LoginHandler)
+		// 文件下载：路径中含整文件 SHA-256 前缀，视为能力链接；群成员无需在 URL 中带各自 JWT 即可在浏览器中打开下载
+		public.GET("/download/*filepath", api.DownloadFile)
 	}
 
 	// 鉴权路由组：需JWT身份验证
@@ -112,8 +114,6 @@ func main() {
 		authorized.GET("/rooms/:id/members", api.GetRoomMembers())
 		authorized.DELETE("/rooms/:id/members/:user_id", api.RemoveRoomMember(hub))
 		authorized.DELETE("/upload/cancel", api.CancelUpload)
-		// 文件下载接口
-		authorized.GET("/download/:filename", api.DownloadFile)
 		// 群聊管理接口
 		authorized.POST("/rooms", api.CreateRoom(hub))
 		authorized.GET("/my_rooms", api.GetMyRooms())

@@ -15,5 +15,5 @@ type User struct {
 	Role      int8                  `gorm:"type:tinyint;not null;default:0;comment:'0:普通用户 1:超管'"`
 	CreatedAt time.Time             `gorm:"comment:'创建时间'"`
 	UpdatedAt time.Time             `gorm:"comment:'更新时间'"`
-	DeletedAt soft_delete.DeletedAt `gorm:"type:bigint unsigned;uniqueIndex:idx_username_deleted,priority:2;softDelete:milli;comment:'毫秒级软删除标记'"` // 架构师级软删除：强转为毫秒级 BIGINT，完美解决高并发同名注销复用问题
+	DeletedAt soft_delete.DeletedAt `gorm:"type:bigint unsigned;uniqueIndex:idx_username_deleted,priority:2;softDelete:milli;comment:'毫秒级软删除标记'"` // 软删除：强转为毫秒级 BIGINT，完美解决高并发同名注销复用问题
 }

@@ -2,92 +2,362 @@
 <html lang="zh-CN">
 <head>
   <meta charset="UTF-8">
-  <title>LAN-IM 界面</title>
+  <title>LAN-IM</title>
   <style>
-    body{font-family:'Segoe UI',Tahoma,sans-serif;background:#121212;color:#fff;margin:0;display:flex;height:100vh;overflow:hidden;}
-    .sidebar{width:300px;background:#1a1a1a;border-right:1px solid #333;display:flex;flex-direction:column;}
-    .sidebar-header{padding:20px;background:#222;border-bottom:1px solid #333;}
-    .room-list{flex:1;overflow-y:auto;padding:10px;}
-    .room-item{padding:15px;margin-bottom:8px;background:#2d2d2d;border-radius:6px;cursor:pointer;transition:0.2s;border-left:4px solid transparent;}
-    .room-item:hover{background:#3d3d3d;}
-    .room-item.active{border-left-color:#007acc;background:#2a2a2a;}
-    .room-name{font-weight:bold;font-size:15px;}
-    .room-id{font-size:12px;color:#888;margin-top:5px;}
-    .main-view{flex:1;display:flex;flex-direction:column;background:#1e1e1e;}
-    .chat-header{height:60px;background:#222;border-bottom:1px solid #333;display:flex;align-items:center;padding:0 20px;font-weight:bold;justify-content:space-between;}
-    #chat-box{flex:1;overflow-y:auto;padding:20px;font-family:Consolas,monospace;}
-    .input-area{padding:20px;background:#222;border-top:1px solid #333;display:flex;gap:10px;}
-    input[type="text"]{flex:1;padding:12px;background:#333;border:1px solid #444;color:white;border-radius:6px;outline:none;}
-    button{padding:12px 20px;background:#007acc;color:white;border:none;border-radius:6px;cursor:pointer;font-weight:bold;transition:0.2s;}
-    button:hover{background:#005999;}
-    button.danger{background:#c0392b;}
-    .log-sys{color:#f39c12;margin-bottom:8px;}
-    .log-msg{color:#2ecc71;margin-bottom:8px;}
-    .log-err{color:#e74c3c;margin-bottom:8px;}
-    .log-hist{color:#bdc3c7;margin-bottom:8px;}
-    .control-panel{width:350px;background:#1a1a1a;border-left:1px solid #333;padding:20px;overflow-y:auto;}
-    .panel-section{background:#2d2d2d;padding:15px;border-radius:8px;margin-bottom:20px;}
-    .panel-section h3{margin-top:0;font-size:14px;color:#aaa;border-bottom:1px solid #444;padding-bottom:10px;}
-    .flex-row{display:flex;gap:10px;margin-bottom:10px;}
-    #progress-bar{height:8px;background:#8e44ad;width:0%;border-radius:4px;transition:width 0.2s;}
-    .progress-bg{background:#444;border-radius:4px;margin-top:10px;overflow:hidden;height:8px;}
+    :root {
+      --bg: #0f0f0f;
+      --panel: #171717;
+      --panel2: #1f1f1f;
+      --border: #2a2a2a;
+      --text: #e8e8e8;
+      --muted: #888;
+      --accent: #0e639c;
+      --accent-hover: #1177bb;
+      --msg-own: #264f78;
+      --msg-other: #2d2d2d;
+      --danger: #c0392b;
+    }
+    * { box-sizing: border-box; }
+    body {
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      margin: 0;
+      height: 100vh;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+    .topbar {
+      height: 52px;
+      min-height: 52px;
+      background: var(--panel);
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 20px;
+      flex-shrink: 0;
+    }
+    .topbar-brand { font-weight: 600; font-size: 15px; color: var(--accent); letter-spacing: 0.02em; }
+    .topbar-user {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      font-size: 13px;
+    }
+    .topbar-user-meta { text-align: right; line-height: 1.35; }
+    .topbar-user-name { font-weight: 600; }
+    .topbar-user-id { color: var(--muted); font-size: 12px; }
+    .btn-ghost {
+      padding: 8px 14px;
+      background: transparent;
+      border: 1px solid var(--border);
+      color: var(--text);
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 13px;
+    }
+    .btn-ghost:hover { background: var(--panel2); }
+    .app-body {
+      flex: 1;
+      display: flex;
+      min-height: 0;
+    }
+    .sidebar {
+      width: 280px;
+      min-width: 240px;
+      background: var(--panel);
+      border-right: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+    }
+    .sidebar-head {
+      padding: 14px 16px;
+      border-bottom: 1px solid var(--border);
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+    }
+    .room-list {
+      flex: 1;
+      overflow-y: auto;
+      padding: 10px 12px;
+    }
+    .room-item {
+      padding: 12px 14px;
+      margin-bottom: 6px;
+      background: var(--panel2);
+      border-radius: 8px;
+      cursor: pointer;
+      border: 1px solid transparent;
+      transition: 0.15s;
+    }
+    .room-item:hover { background: #252525; }
+    .room-item.active {
+      border-color: var(--accent);
+      background: #1a2834;
+    }
+    .room-item.hidden { display: none; }
+    .room-name { font-weight: 600; font-size: 14px; }
+    .room-id { font-size: 12px; color: var(--muted); margin-top: 4px; }
+    .main-view {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      min-width: 0;
+      min-height: 0;
+      background: #141414;
+    }
+    .chat-header {
+      height: 56px;
+      min-height: 56px;
+      padding: 0 20px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      font-weight: 600;
+      font-size: 15px;
+      background: var(--panel);
+    }
+    .chat-header-sub { font-size: 12px; color: var(--muted); font-weight: 400; margin-top: 2px; }
+    .chat-wrap {
+      flex: 1;
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+      position: relative;
+    }
+    .chat-history-hint {
+      text-align: center;
+      font-size: 12px;
+      color: var(--muted);
+      padding: 8px;
+      min-height: 28px;
+    }
+    #chat-box {
+      flex: 1;
+      overflow-y: auto;
+      padding: 16px 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .chat-placeholder {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--muted);
+      font-size: 14px;
+      padding: 40px;
+      text-align: center;
+    }
+    .msg-row { display: flex; flex-direction: column; max-width: 85%; }
+    .msg-row.own { align-self: flex-end; align-items: flex-end; }
+    .msg-row.other { align-self: flex-start; }
+    .msg-meta { font-size: 11px; color: var(--muted); margin-bottom: 4px; padding: 0 4px; }
+    .msg-bubble {
+      padding: 10px 14px;
+      border-radius: 12px;
+      font-size: 14px;
+      line-height: 1.45;
+      word-break: break-word;
+    }
+    .msg-row.own .msg-bubble { background: var(--msg-own); border-bottom-right-radius: 4px; }
+    .msg-row.other .msg-bubble { background: var(--msg-other); border-bottom-left-radius: 4px; }
+    .msg-row.sys .msg-bubble { background: transparent; color: #f39c12; font-size: 13px; padding: 4px 0; }
+    .msg-row.err .msg-bubble { background: transparent; color: var(--danger); font-size: 13px; }
+    .msg-row.hist .msg-bubble { opacity: 0.85; }
+    .msg-bubble .msg-link { color: #6cb3f2; text-decoration: underline; word-break: break-all; }
+    .msg-bubble .msg-link:hover { color: #9dcbf5; }
+    .input-area {
+      padding: 14px 20px;
+      background: var(--panel);
+      border-top: 1px solid var(--border);
+      display: flex;
+      gap: 10px;
+      flex-shrink: 0;
+    }
+    input[type="text"], input[type="number"], input[type="search"] {
+      flex: 1;
+      padding: 11px 14px;
+      background: var(--panel2);
+      border: 1px solid var(--border);
+      color: var(--text);
+      border-radius: 8px;
+      outline: none;
+      font-size: 14px;
+    }
+    input:focus { border-color: var(--accent); }
+    button.primary {
+      padding: 11px 20px;
+      background: var(--accent);
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      font-weight: 600;
+      font-size: 14px;
+    }
+    button.primary:hover { background: var(--accent-hover); }
+    button.primary:disabled { opacity: 0.45; cursor: not-allowed; }
+    button.danger { background: var(--danger); }
+    button.danger:hover { filter: brightness(1.08); }
+    .aside {
+      width: 320px;
+      min-width: 280px;
+      background: var(--panel);
+      border-left: 1px solid var(--border);
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 0;
+    }
+    .aside-block {
+      padding: 16px 18px;
+      border-bottom: 1px solid var(--border);
+    }
+    .aside-block h3 {
+      margin: 0 0 12px;
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+    }
+    .profile-card {
+      display: flex;
+      gap: 12px;
+      align-items: center;
+    }
+    .profile-avatar {
+      width: 48px;
+      height: 48px;
+      border-radius: 10px;
+      background: linear-gradient(135deg, #264f78, #1a3a5c);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      font-size: 18px;
+      flex-shrink: 0;
+    }
+    .profile-lines { min-width: 0; }
+    .profile-lines .name { font-weight: 600; font-size: 15px; }
+    .profile-lines .sub { font-size: 12px; color: var(--muted); margin-top: 2px; }
+    .member-list {
+      max-height: 220px;
+      overflow-y: auto;
+      font-size: 13px;
+    }
+    .member-item {
+      padding: 8px 10px;
+      border-radius: 6px;
+      display: flex;
+      justify-content: space-between;
+      gap: 8px;
+    }
+    .member-item:nth-child(odd) { background: rgba(255,255,255,0.03); }
+    .member-name { font-weight: 500; }
+    .member-id { color: var(--muted); font-size: 12px; }
+    .flex-row { display: flex; gap: 8px; margin-bottom: 10px; }
+    .flex-row:last-child { margin-bottom: 0; }
+    .flex-row input { min-width: 0; }
+    .flex-row button { flex-shrink: 0; white-space: nowrap; }
+    #progress-bar { height: 6px; background: #8e44ad; width: 0%; border-radius: 3px; transition: width 0.2s; }
+    .progress-bg { background: var(--border); border-radius: 3px; margin-top: 8px; overflow: hidden; height: 6px; }
+    .hint { font-size: 12px; color: var(--muted); margin-top: 8px; line-height: 1.4; }
   </style>
 </head>
 <body>
-  <div class="sidebar">
-    <div class="sidebar-header">
-      <h3 style="margin:0;color:#007acc;">我的群聊列表</h3>
-      <button onclick="logout()" style="width:100%;margin-top:10px;background:#444;">退出登录</button>
-    </div>
-    <div class="room-list" id="room-list">
-      <div style="color:#666;text-align:center;margin-top:20px;">正在加载群聊列表...</div>
-    </div>
-  </div>
-
-  <div class="main-view">
-    <div class="chat-header">
-      <span id="current-room-title">未选择群聊，请选择或创建群聊</span>
-      <button onclick="fetchHistory()" style="background:transparent;border:1px solid #555;padding:6px 12px;">获取历史消息</button>
-    </div>
-    <div id="chat-box"></div>
-    <div class="input-area">
-      <input type="text" id="msg-content" placeholder="输入消息 (按 Enter 发送)" onkeypress="handleEnter(event)">
-      <button onclick="sendMsg()">发送</button>
-    </div>
-  </div>
-
-  <div class="control-panel">
-    <div class="panel-section">
-      <h3>创建与加入群聊</h3>
-      <div class="flex-row">
-        <input type="text" id="new-room-name" placeholder="群聊名称" style="width:60%;">
-        <button onclick="createRoom()" style="background:#27ae60;width:40%;">创建群聊</button>
+  <header class="topbar">
+    <div class="topbar-brand">LAN-IM</div>
+    <div class="topbar-user">
+      <div class="topbar-user-meta">
+        <div class="topbar-user-name" id="top-username">用户</div>
+        <div class="topbar-user-id" id="top-userid">—</div>
       </div>
-      <div class="flex-row">
-        <input type="number" id="join-room-id" placeholder="群聊 ID" style="width:60%;">
-        <button onclick="joinRoom()" style="background:#f39c12;width:40%;">加入群聊</button>
-      </div>
+      <button type="button" class="btn-ghost" onclick="logout()">退出登录</button>
     </div>
+  </header>
 
-    <div class="panel-section">
-      <h3>群成员管理</h3>
-      <button onclick="getRoomMembers()" style="width:100%;margin-bottom:10px;background:#2980b9;">获取群成员列表</button>
-      <div class="flex-row">
-        <input type="number" id="kick-user-id" placeholder="用户ID (退群填自己)" style="width:60%;">
-        <button class="danger" onclick="removeMember()" style="width:40%;">移除成员</button>
+  <div class="app-body">
+    <aside class="sidebar">
+      <div class="sidebar-head">群聊列表</div>
+      <div class="room-list" id="room-list">
+        <div style="color:var(--muted);text-align:center;padding:20px;">正在加载…</div>
       </div>
-    </div>
+    </aside>
 
-    <div class="panel-section">
-      <h3>文件传输</h3>
-      <input type="file" id="file-input" style="width:100%;margin-bottom:10px;">
-      <div class="flex-row">
-        <button id="btn-upload" onclick="startUpload()" style="background:#8e44ad;width:60%;">开始上传</button>
-        <button id="btn-cancel" onclick="cancelUpload()" class="danger" style="width:40%;" disabled>取消上传</button>
+    <section class="main-view">
+      <div class="chat-header">
+        <div>
+          <div id="current-room-title">选择左侧群聊开始聊天</div>
+          <div class="chat-header-sub" id="current-room-sub"></div>
+        </div>
       </div>
-      <div style="font-size:12px;color:#888;margin-top:10px;" id="upload-status">等待选择文件...</div>
-      <div class="progress-bg"><div id="progress-bar"></div></div>
-    </div>
+      <div class="chat-wrap" id="chat-wrap">
+        <div class="chat-history-hint" id="history-hint"></div>
+        <div id="chat-box" class="chat-placeholder" data-empty="1">从左侧选择一个群聊，消息将显示在此处。<br>在聊天记录中向上滑动可自动加载更早的消息。</div>
+      </div>
+      <div class="input-area">
+        <input type="text" id="msg-content" placeholder="输入消息，Enter 发送" onkeypress="handleEnter(event)" disabled>
+        <button type="button" class="primary" onclick="sendMsg()" id="btn-send" disabled>发送</button>
+      </div>
+    </section>
+
+    <aside class="aside">
+      <div class="aside-block">
+        <h3>当前用户</h3>
+        <div class="profile-card">
+          <div class="profile-avatar" id="aside-avatar">?</div>
+          <div class="profile-lines">
+            <div class="name" id="aside-username">—</div>
+            <div class="sub" id="aside-userdetail">登录后可查看</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="aside-block">
+        <h3>群成员</h3>
+        <div class="member-list" id="member-list">
+          <div style="color:var(--muted);font-size:13px;">选择群聊后显示成员列表</div>
+        </div>
+        <div class="flex-row" style="margin-top:12px;">
+          <input type="number" id="kick-user-id" placeholder="用户 ID（退群填自己）" style="margin-bottom:0;">
+          <button type="button" class="primary danger" onclick="removeMember()">移除</button>
+        </div>
+      </div>
+
+      <div class="aside-block">
+        <h3>搜索我的群聊</h3>
+        <input type="search" id="room-search" placeholder="按名称筛选…" oninput="filterRoomList()">
+        <p class="hint">仅筛选你已加入的群；若需加入新群，使用下方群 ID。</p>
+        <div class="flex-row" style="margin-top:12px;">
+          <input type="text" id="new-room-name" placeholder="新群名称">
+          <button type="button" class="primary" onclick="createRoom()" style="background:#2d7a3e;">创建</button>
+        </div>
+        <div class="flex-row">
+          <input type="number" id="join-room-id" placeholder="群 ID 加入">
+          <button type="button" class="primary" onclick="joinRoom()" style="background:#b8860b;">加入</button>
+        </div>
+      </div>
+
+      <div class="aside-block">
+        <h3>文件</h3>
+        <input type="file" id="file-input" style="width:100%;margin-bottom:10px;background:var(--panel2);border:1px solid var(--border);border-radius:8px;padding:8px;color:var(--text);">
+        <div class="flex-row">
+          <button type="button" class="primary" id="btn-upload" onclick="startUpload()" style="background:#7d3c98;flex:1;">上传</button>
+          <button type="button" class="primary danger" id="btn-cancel" onclick="cancelUpload()" style="flex:1;" disabled>取消</button>
+        </div>
+        <div class="hint" id="upload-status">选择文件后可上传</div>
+        <div class="progress-bg"><div id="progress-bar"></div></div>
+      </div>
+    </aside>
   </div>
 
   <script>
@@ -102,85 +372,543 @@
 
     let ws = null;
     let currentRoomId = null;
+    let currentRoomName = "";
     let isUploading = false;
     let uploadAbortController = null;
+    let currentUploadFileHash = null;
 
-    function log(msg, type) {
+    let allRooms = [];
+    const loadedMessageIds = new Set();
+    let historyNextCursor = 0;
+    let historyHasMore = false;
+    let historyLoading = false;
+    let selfUserId = null;
+
+    function parseJwtUserId(token) {
+      try {
+        const p = JSON.parse(atob(token.split('.')[1]));
+        return p.user_id != null ? Number(p.user_id) : null;
+      } catch (e) {
+        return null;
+      }
+    }
+
+    function loadUserProfile() {
+      selfUserId = parseJwtUserId(jwtToken);
+      let user = null;
+      try {
+        const raw = localStorage.getItem("lan_im_user");
+        if (raw) user = JSON.parse(raw);
+      } catch (e) {}
+
+      const name = user?.username || (selfUserId != null ? `用户 #${selfUserId}` : "用户");
+      const idLine = selfUserId != null ? `ID ${selfUserId}` : "—";
+      const roleLine = user?.role != null ? `角色 ${user.role}` : "";
+
+      document.getElementById("top-username").textContent = name;
+      document.getElementById("top-userid").textContent = idLine + (roleLine ? " · " + roleLine : "");
+
+      document.getElementById("aside-username").textContent = name;
+      document.getElementById("aside-userdetail").textContent = [idLine, roleLine].filter(Boolean).join(" · ") || "—";
+
+      const initials = name.slice(0, 2).toUpperCase();
+      document.getElementById("aside-avatar").textContent = initials;
+    }
+
+    function rightRotate32(v, n) {
+      return (v >>> n) | (v << (32 - n));
+    }
+
+    function sha256ArrayBufferFallback(arrayBuffer) {
+      const K = [
+        0x428a2f98, 0x71374491, 0xb5c0fbcf, 0xe9b5dba5, 0x3956c25b, 0x59f111f1, 0x923f82a4, 0xab1c5ed5,
+        0xd807aa98, 0x12835b01, 0x243185be, 0x550c7dc3, 0x72be5d74, 0x80deb1fe, 0x9bdc06a7, 0xc19bf174,
+        0xe49b69c1, 0xefbe4786, 0x0fc19dc6, 0x240ca1cc, 0x2de92c6f, 0x4a7484aa, 0x5cb0a9dc, 0x76f988da,
+        0x983e5152, 0xa831c66d, 0xb00327c8, 0xbf597fc7, 0xc6e00bf3, 0xd5a79147, 0x06ca6351, 0x14292967,
+        0x27b70a85, 0x2e1b2138, 0x4d2c6dfc, 0x53380d13, 0x650a7354, 0x766a0abb, 0x81c2c92e, 0x92722c85,
+        0xa2bfe8a1, 0xa81a664b, 0xc24b8b70, 0xc76c51a3, 0xd192e819, 0xd6990624, 0xf40e3585, 0x106aa070,
+        0x19a4c116, 0x1e376c08, 0x2748774c, 0x34b0bcb5, 0x391c0cb3, 0x4ed8aa4a, 0x5b9cca4f, 0x682e6ff3,
+        0x748f82ee, 0x78a5636f, 0x84c87814, 0x8cc70208, 0x90befffa, 0xa4506ceb, 0xbef9a3f7, 0xc67178f2
+      ];
+
+      const H = [
+        0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a,
+        0x510e527f, 0x9b05688c, 0x1f83d9ab, 0x5be0cd19
+      ];
+
+      const bytes = new Uint8Array(arrayBuffer);
+      const bitLen = bytes.length * 8;
+      const withOne = bytes.length + 1;
+      const padLen = (64 - ((withOne + 8) % 64)) % 64;
+      const totalLen = withOne + padLen + 8;
+
+      const padded = new Uint8Array(totalLen);
+      padded.set(bytes);
+      padded[bytes.length] = 0x80;
+
+      const bitLenHi = Math.floor(bitLen / 0x100000000);
+      const bitLenLo = bitLen >>> 0;
+      padded[totalLen - 8] = (bitLenHi >>> 24) & 0xff;
+      padded[totalLen - 7] = (bitLenHi >>> 16) & 0xff;
+      padded[totalLen - 6] = (bitLenHi >>> 8) & 0xff;
+      padded[totalLen - 5] = bitLenHi & 0xff;
+      padded[totalLen - 4] = (bitLenLo >>> 24) & 0xff;
+      padded[totalLen - 3] = (bitLenLo >>> 16) & 0xff;
+      padded[totalLen - 2] = (bitLenLo >>> 8) & 0xff;
+      padded[totalLen - 1] = bitLenLo & 0xff;
+
+      const w = new Uint32Array(64);
+
+      for (let offset = 0; offset < totalLen; offset += 64) {
+        for (let i = 0; i < 16; i++) {
+          const j = offset + i * 4;
+          w[i] = (
+            (padded[j] << 24) |
+            (padded[j + 1] << 16) |
+            (padded[j + 2] << 8) |
+            padded[j + 3]
+          ) >>> 0;
+        }
+
+        for (let i = 16; i < 64; i++) {
+          const s0 = rightRotate32(w[i - 15], 7) ^ rightRotate32(w[i - 15], 18) ^ (w[i - 15] >>> 3);
+          const s1 = rightRotate32(w[i - 2], 17) ^ rightRotate32(w[i - 2], 19) ^ (w[i - 2] >>> 10);
+          w[i] = (((w[i - 16] + s0) >>> 0) + ((w[i - 7] + s1) >>> 0)) >>> 0;
+        }
+
+        let a = H[0], b = H[1], c = H[2], d = H[3], e = H[4], f = H[5], g = H[6], h = H[7];
+
+        for (let i = 0; i < 64; i++) {
+          const S1 = rightRotate32(e, 6) ^ rightRotate32(e, 11) ^ rightRotate32(e, 25);
+          const ch = (e & f) ^ (~e & g);
+          const temp1 = (((((h + S1) >>> 0) + ch) >>> 0) + ((K[i] + w[i]) >>> 0)) >>> 0;
+          const S0 = rightRotate32(a, 2) ^ rightRotate32(a, 13) ^ rightRotate32(a, 22);
+          const maj = (a & b) ^ (a & c) ^ (b & c);
+          const temp2 = (S0 + maj) >>> 0;
+
+          h = g;
+          g = f;
+          f = e;
+          e = (d + temp1) >>> 0;
+          d = c;
+          c = b;
+          b = a;
+          a = (temp1 + temp2) >>> 0;
+        }
+
+        H[0] = (H[0] + a) >>> 0;
+        H[1] = (H[1] + b) >>> 0;
+        H[2] = (H[2] + c) >>> 0;
+        H[3] = (H[3] + d) >>> 0;
+        H[4] = (H[4] + e) >>> 0;
+        H[5] = (H[5] + f) >>> 0;
+        H[6] = (H[6] + g) >>> 0;
+        H[7] = (H[7] + h) >>> 0;
+      }
+
+      return H.map(v => v.toString(16).padStart(8, "0")).join("");
+    }
+
+    async function computeFileSha256Hex(file) {
+      const buf = await file.arrayBuffer();
+      const subtle = globalThis.crypto && globalThis.crypto.subtle;
+      if (subtle && typeof subtle.digest === "function") {
+        const hashBuffer = await subtle.digest("SHA-256", buf);
+        return Array.from(new Uint8Array(hashBuffer))
+          .map(b => b.toString(16).padStart(2, "0"))
+          .join("");
+      }
+      return sha256ArrayBufferFallback(buf);
+    }
+
+    async function readErrorMessage(res) {
+      try {
+        const data = await res.clone().json();
+        if (data && typeof data.error === "string" && data.error) return data.error;
+        if (data && typeof data.msg === "string" && data.msg) return data.msg;
+      } catch (e) {}
+      try {
+        const text = await res.text();
+        if (text) return text.slice(0, 180);
+      } catch (e) {}
+      return `HTTP ${res.status}`;
+    }
+
+    function escapeHtml(s) {
+      if (s == null) return "";
+      const d = document.createElement("div");
+      d.textContent = String(s);
+      return d.innerHTML;
+    }
+
+    /**
+     * 聊天内容：普通文本转义；下载地址转为可点击链接（下载接口为公开能力链接，群友点开即可下，无需各自带 JWT）。
+     */
+    function formatChatMessageHtml(raw) {
+      if (raw == null) return "";
+      const s = String(raw);
+      const re = /(https?:\/\/[^\s]+\/api\/v1\/download\/[^\s?#]+|\/api\/v1\/download\/[^\s?#]+)/g;
+      let last = 0;
+      let m;
+      const parts = [];
+      while ((m = re.exec(s)) !== null) {
+        parts.push(escapeHtml(s.slice(last, m.index)));
+        const urlStr = m[1];
+        let href = urlStr;
+        let saveAs = "";
+        try {
+          const u = new URL(urlStr, window.location.origin);
+          if (u.pathname.indexOf("/api/v1/download/") !== -1) {
+            u.search = "";
+            u.hash = "";
+            href = u.href;
+            const seg = u.pathname.split("/").pop() || "";
+            const hm = /^([a-f0-9]{64})_(.+)$/i.exec(seg);
+            saveAs = hm ? hm[2] : seg;
+          }
+        } catch (e) {}
+        const dlAttr = saveAs ? ` download="${escapeHtml(saveAs)}"` : "";
+        parts.push(
+          `<a class="msg-link" href="${escapeHtml(href)}"${dlAttr}>${escapeHtml(urlStr)}</a>`
+        );
+        last = m.index + m[0].length;
+      }
+      parts.push(escapeHtml(s.slice(last)));
+      return parts.join("");
+    }
+
+    function getChatBox() {
+      const wrap = document.getElementById("chat-wrap");
+      let box = document.getElementById("chat-box");
+      if (!box || box.dataset.empty === "1") {
+        if (box) box.remove();
+        box = document.createElement("div");
+        box.id = "chat-box";
+        const hint = document.getElementById("history-hint");
+        wrap.insertBefore(box, hint.nextSibling);
+      }
+      return box;
+    }
+
+    function ensureChatScrollable() {
       const box = document.getElementById("chat-box");
-      box.innerHTML += `<div class="${type}">[${new Date().toLocaleTimeString()}] ${msg}</div>`;
-      box.scrollTop = box.scrollHeight;
+      if (box && box.dataset.empty === "1") return null;
+      return box;
+    }
+
+    function isNearBottom(el) {
+      if (!el) return true;
+      return el.scrollHeight - el.scrollTop - el.clientHeight < 100;
+    }
+
+    function appendBubble(html, className, scrollToEnd) {
+      const box = getChatBox();
+      box.dataset.empty = "0";
+      const wrap = document.createElement("div");
+      wrap.className = "msg-row " + (className || "other");
+      wrap.innerHTML = html;
+      box.appendChild(wrap);
+      if (scrollToEnd !== false && isNearBottom(box)) {
+        box.scrollTop = box.scrollHeight;
+      }
+    }
+
+    function notifyLine(text, kind) {
+      const k = kind === "err" ? "err" : "sys";
+      appendBubble(`<div class="msg-bubble">${escapeHtml(text)}</div>`, k, true);
+    }
+
+    function renderMessageRecord(msg, kind) {
+      const sid = msg.sender_id != null ? msg.sender_id : msg.SenderID;
+      const content = msg.content != null ? msg.content : msg.Content;
+      const id = msg.id != null ? msg.id : msg.ID;
+      const created = msg.created_at || msg.CreatedAt;
+      let timeStr = "";
+      if (created) {
+        try { timeStr = new Date(created).toLocaleString(); } catch (e) { timeStr = ""; }
+      }
+      const own = selfUserId != null && Number(sid) === selfUserId;
+      const rowCls = own ? "own" : "other";
+      const hist = kind === "hist" ? " hist" : "";
+      const meta = `UID ${sid}` + (timeStr ? " · " + timeStr : "");
+      return `<div class="msg-meta">${escapeHtml(meta)}</div><div class="msg-bubble">${formatChatMessageHtml(content)}</div>`;
+    }
+
+    function insertMessageNode(msg, kind) {
+      const id = msg.id != null ? msg.id : msg.ID;
+      if (id != null && loadedMessageIds.has(id)) return false;
+      if (id != null) loadedMessageIds.add(id);
+
+      const box = getChatBox();
+      box.dataset.empty = "0";
+      const wrap = document.createElement("div");
+      const sid = msg.sender_id != null ? msg.sender_id : msg.SenderID;
+      const own = selfUserId != null && Number(sid) === selfUserId;
+      wrap.className = "msg-row " + (own ? "own" : "other") + (kind === "hist" ? " hist" : "");
+      wrap.innerHTML = renderMessageRecord(msg, kind);
+      box.appendChild(wrap);
+      return true;
+    }
+
+    function prependMessages(msgs, kind) {
+      const box = ensureChatScrollable();
+      if (!box) return;
+      const oldH = box.scrollHeight;
+      const oldT = box.scrollTop;
+
+      const frag = document.createDocumentFragment();
+      for (const msg of msgs) {
+        const id = msg.id != null ? msg.id : msg.ID;
+        if (id != null && loadedMessageIds.has(id)) continue;
+        if (id != null) loadedMessageIds.add(id);
+        const sid = msg.sender_id != null ? msg.sender_id : msg.SenderID;
+        const own = selfUserId != null && Number(sid) === selfUserId;
+        const wrap = document.createElement("div");
+        wrap.className = "msg-row " + (own ? "own" : "other") + (kind === "hist" ? " hist" : "");
+        wrap.innerHTML = renderMessageRecord(msg, kind);
+        frag.appendChild(wrap);
+      }
+      box.insertBefore(frag, box.firstChild);
+      box.scrollTop = oldT + (box.scrollHeight - oldH);
+    }
+
+    function resetChatArea() {
+      historyNextCursor = 0;
+      historyHasMore = false;
+      historyLoading = false;
+      loadedMessageIds.clear();
+      const wrap = document.getElementById("chat-wrap");
+      const hint = document.getElementById("history-hint");
+      hint.textContent = "";
+      const old = document.getElementById("chat-box");
+      if (old) old.remove();
+      const ph = document.createElement("div");
+      ph.id = "chat-box";
+      ph.className = "chat-placeholder";
+      ph.dataset.empty = "1";
+      ph.innerHTML = "正在加载消息…";
+      wrap.insertBefore(ph, hint.nextSibling);
+    }
+
+    function bindChatScroll() {
+      const box = ensureChatScrollable();
+      if (!box || box.dataset.scrollBound === "1") return;
+      box.dataset.scrollBound = "1";
+      box.addEventListener("scroll", () => {
+        if (box.scrollTop < 80 && historyHasMore && !historyLoading && currentRoomId) {
+          loadOlderHistory();
+        }
+      });
+    }
+
+    async function loadInitialHistory() {
+      if (!currentRoomId) return;
+      historyLoading = true;
+      document.getElementById("history-hint").textContent = "加载中…";
+      try {
+        const res = await fetch(`${API_BASE}/rooms/${currentRoomId}/messages?cursor=0&limit=40`, {
+          headers: { Authorization: `Bearer ${jwtToken}` }
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || "加载失败");
+
+        const msgs = data.messages || [];
+        historyNextCursor = data.next_cursor || 0;
+        historyHasMore = !!data.has_more;
+
+        const ph = document.getElementById("chat-box");
+        if (ph && ph.dataset.empty === "1") ph.remove();
+
+        const box = getChatBox();
+        box.innerHTML = "";
+        box.classList.remove("chat-placeholder");
+        box.dataset.empty = "0";
+
+        for (const msg of msgs) {
+          const id = msg.id != null ? msg.id : msg.ID;
+          if (id != null) loadedMessageIds.add(id);
+          const sid = msg.sender_id != null ? msg.sender_id : msg.SenderID;
+          const own = selfUserId != null && Number(sid) === selfUserId;
+          const wrap = document.createElement("div");
+          wrap.className = "msg-row " + (own ? "own" : "other") + " hist";
+          wrap.innerHTML = renderMessageRecord(msg, "hist");
+          box.appendChild(wrap);
+        }
+
+        box.scrollTop = box.scrollHeight;
+        bindChatScroll();
+        document.getElementById("history-hint").textContent =
+          historyHasMore ? "↑ 向上滑动加载更早消息" : (msgs.length ? "已加载全部历史" : "暂无消息");
+      } catch (e) {
+        notifyLine("历史消息加载失败: " + e.message, "err");
+        document.getElementById("history-hint").textContent = "";
+      } finally {
+        historyLoading = false;
+      }
+    }
+
+    async function loadOlderHistory() {
+      if (!currentRoomId || !historyHasMore || historyLoading || historyNextCursor <= 0) return;
+      historyLoading = true;
+      document.getElementById("history-hint").textContent = "加载更早消息…";
+      try {
+        const res = await fetch(
+          `${API_BASE}/rooms/${currentRoomId}/messages?cursor=${historyNextCursor}&limit=40`,
+          { headers: { Authorization: `Bearer ${jwtToken}` } }
+        );
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || "加载失败");
+
+        const msgs = data.messages || [];
+        historyNextCursor = data.next_cursor || 0;
+        historyHasMore = !!data.has_more;
+
+        prependMessages(msgs, "hist");
+        document.getElementById("history-hint").textContent =
+          historyHasMore ? "↑ 继续上滑加载" : "已加载全部历史";
+      } catch (e) {
+        notifyLine("加载更早消息失败: " + e.message, "err");
+      } finally {
+        historyLoading = false;
+      }
     }
 
     function logout() {
       localStorage.removeItem("lan_im_token");
+      localStorage.removeItem("lan_im_user");
       window.location.href = "index.html";
     }
 
     async function init() {
+      loadUserProfile();
       await loadMyRooms();
       connectWS();
     }
 
+    function filterRoomList() {
+      const q = (document.getElementById("room-search").value || "").trim().toLowerCase();
+      document.querySelectorAll("#room-list .room-item").forEach(el => {
+        const name = (el.dataset.roomName || "").toLowerCase();
+        el.classList.toggle("hidden", q.length > 0 && !name.includes(q));
+      });
+    }
+
     async function loadMyRooms() {
+      const listObj = document.getElementById("room-list");
       try {
         const res = await fetch(`${API_BASE}/my_rooms`, {
-          headers: { 'Authorization': `Bearer ${jwtToken}` }
+          headers: { Authorization: `Bearer ${jwtToken}` }
         });
         const data = await res.json();
-        const listObj = document.getElementById("room-list");
-        if (!res.ok) return listObj.innerHTML = `<div style="color:red;text-align:center;">加载群聊失败</div>`;
-        listObj.innerHTML = "";
-        if (!data.rooms || data.rooms.length === 0) {
-          listObj.innerHTML = `<div style="color:#888;text-align:center;margin-top:20px;">暂无加入的群聊</div>`;
+        if (!res.ok) {
+          listObj.innerHTML = `<div style="color:#e74c3c;text-align:center;padding:16px;">加载失败</div>`;
           return;
         }
-        data.rooms.forEach(room => {
+        allRooms = data.rooms || [];
+        listObj.innerHTML = "";
+        if (!allRooms.length) {
+          listObj.innerHTML = `<div style="color:var(--muted);text-align:center;padding:24px;">暂无群聊，可在右侧创建或加入</div>`;
+          return;
+        }
+        allRooms.forEach(room => {
           const div = document.createElement("div");
           div.className = "room-item";
+          div.dataset.roomName = room.room_name || "";
           div.onclick = () => selectRoom(room.room_id, room.room_name, div);
-          div.innerHTML = `<div class="room-name"># ${room.room_name}</div><div class="room-id">ID: ${room.room_id}</div>`;
+          div.innerHTML = `<div class="room-name"># ${escapeHtml(room.room_name)}</div><div class="room-id">ID: ${room.room_id}</div>`;
           listObj.appendChild(div);
         });
+        filterRoomList();
       } catch (e) {
-        log("加载群列表网络异常", "log-err");
+        listObj.innerHTML = `<div style="color:#e74c3c;text-align:center;">网络异常</div>`;
       }
     }
 
-    function selectRoom(id, name, element) {
+    async function selectRoom(id, name, element) {
       currentRoomId = id;
-      document.getElementById("current-room-title").innerText = `当前群聊：${name} (ID: ${id})`;
-      document.querySelectorAll('.room-item').forEach(el => el.classList.remove('active'));
-      if(element) element.classList.add('active');
-      document.getElementById("chat-box").innerHTML = "";
-      log(`已切换至群聊 [${id}]，可获取历史消息。`, "log-sys");
+      currentRoomName = name || "";
+      document.getElementById("current-room-title").textContent = `# ${currentRoomName || "群聊"}`;
+      document.getElementById("current-room-sub").textContent = `群 ID ${id}`;
+      document.querySelectorAll(".room-item").forEach(el => el.classList.remove("active"));
+      if (element) element.classList.add("active");
+
+      document.getElementById("msg-content").disabled = false;
+      document.getElementById("btn-send").disabled = false;
+
+      resetChatArea();
+      await Promise.all([loadInitialHistory(), refreshMembers()]);
+      notifyLine(`已切换到群「${currentRoomName || id}」`, "sys");
+    }
+
+    async function refreshMembers() {
+      const container = document.getElementById("member-list");
+      if (!currentRoomId) {
+        container.innerHTML = `<div style="color:var(--muted);font-size:13px;">选择群聊后显示成员列表</div>`;
+        return;
+      }
+      container.innerHTML = `<div style="color:var(--muted);">加载中…</div>`;
+      try {
+        const res = await fetch(`${API_BASE}/rooms/${currentRoomId}/members`, {
+          headers: { Authorization: `Bearer ${jwtToken}` }
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          container.innerHTML = `<div style="color:#e74c3c;font-size:13px;">${escapeHtml(data.error || "无权限")}</div>`;
+          return;
+        }
+        const members = data.members || [];
+        if (!members.length) {
+          container.innerHTML = `<div style="color:var(--muted);">暂无成员数据</div>`;
+          return;
+        }
+        container.innerHTML = "";
+        members.forEach(m => {
+          const uid = m.user_id != null ? m.user_id : m.UserID;
+          const uname = m.username != null ? m.username : m.Username || "—";
+          const row = document.createElement("div");
+          row.className = "member-item";
+          row.innerHTML = `<span class="member-name">${escapeHtml(String(uname))}</span><span class="member-id">#${uid}</span>`;
+          container.appendChild(row);
+        });
+      } catch (e) {
+        container.innerHTML = `<div style="color:#e74c3c;">请求失败</div>`;
+      }
     }
 
     function connectWS() {
       ws = new WebSocket(`${WS_BASE}?token=${jwtToken}`);
-      ws.onopen = () => log("WebSocket 连接成功", "log-sys");
-      ws.onclose = () => log("WebSocket 连接断开", "log-err");
-      ws.onerror = () => log("WebSocket 连接异常", "log-err");
+      ws.onopen = () => notifyLine("实时连接已建立", "sys");
+      ws.onclose = () => notifyLine("连接已断开", "err");
+      ws.onerror = () => notifyLine("连接异常", "err");
       ws.onmessage = (e) => {
-        const msgs = e.data.split('\n');
+        const msgs = e.data.split("\n");
         msgs.forEach(rawText => {
           if (!rawText.trim()) return;
           try {
             const msg = JSON.parse(rawText);
-            const room = msg.room_id || msg.RoomID;
-            const content = msg.content || msg.Content;
-            const sender = msg.sender_id || msg.SenderID;
+            const room = msg.room_id != null ? msg.room_id : msg.RoomID;
+            const content = msg.content != null ? msg.content : msg.Content;
+            const sender = msg.sender_id != null ? msg.sender_id : msg.SenderID;
             if (room === currentRoomId || room === "全局") {
-              log(`UID(${sender}): ${content}`, "log-msg");
+              const pseudo = {
+                sender_id: sender,
+                content,
+                created_at: new Date().toISOString()
+              };
+              const near = isNearBottom(ensureChatScrollable());
+              insertMessageNode(pseudo, "live");
+              const box = ensureChatScrollable();
+              if (box && near) box.scrollTop = box.scrollHeight;
             }
           } catch (err) {
-            log("消息格式错误", "log-err");
+            notifyLine("收到无法解析的消息", "err");
           }
         });
       };
     }
 
     function handleEnter(e) {
-      if (e.key === 'Enter') sendMsg();
+      if (e.key === "Enter") sendMsg();
     }
 
     function sendMsg() {
@@ -189,40 +917,25 @@
       const input = document.getElementById("msg-content");
       if (!input.value) return;
       ws.send(JSON.stringify({ room_id: currentRoomId, content: input.value }));
-      log(`发送: ${input.value}`, "log-sys");
+      notifyLine(`已发送: ${input.value}`, "sys");
       input.value = "";
     }
 
-    async function fetchHistory() {
-      if (!currentRoomId) return alert("请先选择群聊！");
-      try {
-        const res = await fetch(`${API_BASE}/rooms/${currentRoomId}/messages`, {
-          headers: { 'Authorization': `Bearer ${jwtToken}` }
-        });
-        const data = await res.json();
-        const msgs = data.data || data.messages || data || [];
-        if (!msgs.length) return log(`暂无历史消息。`, "log-hist");
-        msgs.forEach(msg => log(`[历史] UID(${msg.sender_id || msg.SenderID}): ${msg.content || msg.Content}`, "log-hist"));
-      } catch (e) {
-        log("获取历史消息异常", "log-err");
-      }
-    }
-
     async function createRoom() {
-      const name = document.getElementById("new-room-name").value;
+      const name = document.getElementById("new-room-name").value.trim();
       if (!name) return alert("群聊名称不可为空");
       try {
         const res = await fetch(`${API_BASE}/rooms`, {
-          method: 'POST',
+          method: "POST",
           headers: {
-            'Authorization': `Bearer ${jwtToken}`,
-            'Content-Type': 'application/json'
+            Authorization: `Bearer ${jwtToken}`,
+            "Content-Type": "application/json"
           },
-          body: JSON.stringify({ name: name })
+          body: JSON.stringify({ name })
         });
         if (res.ok) {
-          alert("创建群聊成功！");
-          loadMyRooms();
+          document.getElementById("new-room-name").value = "";
+          await loadMyRooms();
         } else alert("创建群聊失败");
       } catch (e) {
         alert("网络异常");
@@ -230,120 +943,90 @@
     }
 
     async function joinRoom() {
-      const id = parseInt(document.getElementById("join-room-id").value);
+      const id = parseInt(document.getElementById("join-room-id").value, 10);
       if (!id) return;
       try {
         const res = await fetch(`${API_BASE}/rooms/${id}/join`, {
-          method: 'POST',
-          headers: { 'Authorization': `Bearer ${jwtToken}` }
+          method: "POST",
+          headers: { Authorization: `Bearer ${jwtToken}` }
         });
         if (res.ok) {
-          alert("加入群聊成功！");
-          loadMyRooms();
+          document.getElementById("join-room-id").value = "";
+          await loadMyRooms();
         } else alert("加入群聊失败");
       } catch (e) {
         alert("网络异常");
       }
     }
 
-    async function getRoomMembers() {
-      if (!currentRoomId) return alert("请先选择群聊！");
-      try {
-        const res = await fetch(`${API_BASE}/rooms/${currentRoomId}/members`, {
-          headers: { 'Authorization': `Bearer ${jwtToken}` }
-        });
-        const data = await res.json();
-        if (res.ok) {
-          log(`[群成员列表]：`, "log-sys");
-          data.members.forEach(m => log(` - UID: ${m.user_id} | Name: ${m.username}`, "log-sys"));
-        } else log(`权限不足：${data.error}`, "log-err");
-      } catch (e) {
-        log("请求异常", "log-err");
-      }
-    }
-
     async function removeMember() {
       if (!currentRoomId) return alert("请先选择群聊！");
-      const targetId = parseInt(document.getElementById("kick-user-id").value);
+      const targetId = parseInt(document.getElementById("kick-user-id").value, 10);
       if (!targetId) return;
       try {
         const res = await fetch(`${API_BASE}/rooms/${currentRoomId}/members/${targetId}`, {
-          method: 'DELETE',
-          headers: { 'Authorization': `Bearer ${jwtToken}` }
+          method: "DELETE",
+          headers: { Authorization: `Bearer ${jwtToken}` }
         });
         if (res.ok) {
-          log(`操作成功！`, "log-sys");
-          loadMyRooms();
-        } else log(`操作失败：${(await res.json()).error}`, "log-err");
+          document.getElementById("kick-user-id").value = "";
+          await loadMyRooms();
+          await refreshMembers();
+        } else {
+          const j = await res.json().catch(() => ({}));
+          alert(j.error || "操作失败");
+        }
       } catch (e) {
-        log("请求异常", "log-err");
+        alert("请求异常");
       }
     }
 
-    // ==================== 全局上传状态变量 ====================
-
-
-    // ==================== 核心：开始上传文件 ====================
-    /**
-     * 启动文件分片上传（支持断点续传、秒传、并发上传、取消功能）
-     * 流程：状态校验 → 秒传检测 → 并发分片上传 → 合并文件 → 发送IM消息
-     */
     async function startUpload() {
-      // 校验：未选择群聊
       if (!currentRoomId) {
         return alert("请先选择群聊！");
       }
-      // 校验：重复上传
-      if (isUploading) {
-        return;
-      }
+      if (isUploading) return;
 
-      // 获取文件对象
-      const fileInput = document.getElementById('file-input');
+      const fileInput = document.getElementById("file-input");
       if (!fileInput.files.length) {
-        return alert("请选择物理文件！");
+        return alert("请选择文件");
       }
 
       const file = fileInput.files[0];
-      // 分片大小：1MB
-      const chunkSize = 1 * 1024 * 1024;
-      // 计算总分片数
+      if (!file || file.size <= 0) {
+        alert("空文件暂不支持上传");
+        return;
+      }
+      const chunkSize = 1024 * 1024;
       const totalChunks = Math.ceil(file.size / chunkSize);
-
-      // 安全处理：编码文件名，防止URL注入/特殊字符异常
       const safeFileName = encodeURIComponent(file.name);
-      // 生成文件唯一标识（生产环境建议替换为真实MD5/SHA256）
 
-      
-      // 提取文件前 1MB 数据计算真实 SHA-256（极速指纹）
-      const sliceBuffer = await file.slice(0, 1024 * 1024).arrayBuffer();
-      const hashBuffer = await crypto.subtle.digest('SHA-256', sliceBuffer);
-      const hashArray = Array.from(new Uint8Array(hashBuffer));
-      // 最终生成的是绝对安全的 64 位纯英文数字混合字符串
-      const fileHash = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+      const statusBox = document.getElementById("upload-status");
+      statusBox.textContent = "[0/3] 计算整文件 SHA-256…";
+      let fileHash;
+      try {
+        fileHash = await computeFileSha256Hex(file);
+      } catch (e) {
+        statusBox.textContent = "校验和失败: " + (e.message || e);
+        return;
+      }
+      currentUploadFileHash = fileHash;
 
-      // 更新UI状态：禁用上传按钮，启用取消按钮
       isUploading = true;
-      document.getElementById('btn-upload').disabled = true;
-      document.getElementById('btn-cancel').disabled = false;
-      // 初始化取消控制器
+      document.getElementById("btn-upload").disabled = true;
+      document.getElementById("btn-cancel").disabled = false;
       uploadAbortController = new AbortController();
 
-      const statusBox = document.getElementById('upload-status');
-
       try {
-        // ==================== 第一步：文件状态校验（秒传检测） ====================
-        statusBox.innerText = `[1/3] 握手探测：检查文件物理状态...`;
+        statusBox.textContent = "[1/3] 检查上传状态…";
         const checkRes = await fetch(`${API_BASE}/upload/status?hash=${fileHash}&filename=${safeFileName}`, {
-          headers: { 'Authorization': `Bearer ${jwtToken}` }
+          headers: { Authorization: `Bearer ${jwtToken}` }
         });
         const checkData = await checkRes.json();
 
-        // 秒传逻辑：文件已存在，直接发送消息
         if (checkData.status === "completed") {
           updateProgress(totalChunks, totalChunks);
-          statusBox.innerText = `文件已存在，秒传触发成功！`;
-          // 通过WebSocket发送文件消息到IM群聊
+          statusBox.textContent = "秒传成功";
           ws.send(JSON.stringify({
             room_id: currentRoomId,
             content: `[文件] ${checkData.download_url}`
@@ -352,151 +1035,133 @@
           return;
         }
 
-        // 获取已上传的分片索引
         const uploadedChunks = checkData.uploaded_chunks || [];
-        // 已完成分片计数
         let completedCount = uploadedChunks.length;
-        // 初始化进度条
         updateProgress(completedCount, totalChunks);
 
-        // ==================== 第二步：并发分片上传 ====================
-        statusBox.innerText = `[2/3] 分配并发调度池，启动数据泵...`;
+        statusBox.textContent = "[2/3] 上传分片…";
         const uploadTasks = [];
 
-        // 生成未上传分片的任务队列
         for (let i = 0; i < totalChunks; i++) {
-          // 跳过已上传的分片（断点续传核心）
           if (uploadedChunks.includes(i)) continue;
-
           uploadTasks.push(async () => {
             const formData = new FormData();
-            // 切割文件分片
-            formData.append('chunk', file.slice(i * chunkSize, Math.min((i + 1) * chunkSize, file.size)));
-            formData.append('hash', fileHash);
-            formData.append('chunk_index', i);
+            formData.append("chunk", file.slice(i * chunkSize, Math.min((i + 1) * chunkSize, file.size)));
+            formData.append("hash", fileHash);
+            formData.append("chunk_index", String(i));
 
-            // 上传单个分片，支持取消中断
-            const res = await fetch(`${API_BASE}/upload/chunk`, {
-              method: 'POST',
-              headers: { 'Authorization': `Bearer ${jwtToken}` },
-              body: formData,
-              signal: uploadAbortController.signal
-            });
-
-            if (!res.ok) throw new Error(`分片 ${i} 遭遇底层拒绝`);
-            // 原子更新进度
+            let lastErr = "";
+            const maxAttempts = 2;
+            for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+              const res = await fetch(`${API_BASE}/upload/chunk`, {
+                method: "POST",
+                headers: { Authorization: `Bearer ${jwtToken}` },
+                body: formData,
+                signal: uploadAbortController.signal
+              });
+              if (res.ok) {
+                lastErr = "";
+                break;
+              }
+              const detail = await readErrorMessage(res);
+              lastErr = `HTTP ${res.status}: ${detail}`;
+              if (res.status === 401) {
+                throw new Error("登录已过期，请重新登录");
+              }
+              if (attempt < maxAttempts) {
+                await new Promise(r => setTimeout(r, 250));
+              }
+            }
+            if (lastErr) {
+              throw new Error(`分片 ${i} 上传失败（${lastErr}）`);
+            }
             completedCount++;
             updateProgress(completedCount, totalChunks);
           });
         }
 
-        // 并发控制：最大6个请求，防止浏览器TCP连接超限
         const MAX_CONCURRENT = 6;
         let taskIndex = 0;
-        // 创建并发工作池
-        const workers = new Array(MAX_CONCURRENT).fill(null).map(async () => {
-          while (taskIndex < uploadTasks.length) {
-            const currentIndex = taskIndex++;
-            await uploadTasks[currentIndex]();
-          }
-        });
+        await Promise.all(
+          new Array(MAX_CONCURRENT).fill(null).map(async () => {
+            while (taskIndex < uploadTasks.length) {
+              const idx = taskIndex++;
+              await uploadTasks[idx]();
+            }
+          })
+        );
 
-        // 等待所有分片上传完成
-        await Promise.all(workers);
+        statusBox.textContent = "[3/3] 合并文件…";
+        const mergeHash = String(fileHash || "").trim();
+        const mergeFilename = String(file.name || "").trim();
+        const mergeTotalChunks = String(totalChunks);
+        if (!mergeHash || !mergeFilename || totalChunks <= 0) {
+          throw new Error("合并参数本地校验失败");
+        }
 
-        // ==================== 第三步：合并分片 ====================
-        statusBox.innerText = `[3/3] 数据传输完毕，向后端下发合并指令...`;
         const mergeData = new FormData();
-        mergeData.append('hash', fileHash);
-        mergeData.append('filename', file.name);
-        mergeData.append('total_chunks', totalChunks);
+        mergeData.append("hash", mergeHash);
+        mergeData.append("filename", mergeFilename);
+        mergeData.append("total_chunks", mergeTotalChunks);
 
         const mergeRes = await fetch(`${API_BASE}/upload/merge`, {
-          method: 'POST',
-          headers: { 'Authorization': `Bearer ${jwtToken}` },
+          method: "POST",
+          headers: { Authorization: `Bearer ${jwtToken}` },
           body: mergeData
         });
-
         const mergeResult = await mergeRes.json();
         if (!mergeRes.ok) throw new Error(mergeResult.error);
 
-        // 上传完成，发送文件消息
-        statusBox.innerText = `全链路传输合并成功！`;
+        statusBox.textContent = "上传完成";
         ws.send(JSON.stringify({
           room_id: currentRoomId,
           content: `[文件] ${mergeResult.download_url}`
         }));
-
       } catch (err) {
-        // 异常处理：区分用户取消/上传失败
-        if (err.name === 'AbortError') {
-          statusBox.innerText = `传输已由用户强行切断`;
+        if (err.name === "AbortError") {
+          statusBox.textContent = "已取消上传";
         } else {
-          statusBox.innerText = `底层传输失败: ${err.message}`;
+          statusBox.textContent = "失败: " + err.message;
         }
       } finally {
-        // 无论成功/失败，重置上传UI状态
         unlockUploadUI();
       }
     }
 
-    // ==================== 取消上传 ====================
-    /**
-     * 取消文件上传
-     * 1. 中断前端请求 2. 通知后端清理临时分片 3. 重置UI
-     */
     async function cancelUpload() {
       if (!isUploading) return;
+      const hashToCancel = currentUploadFileHash;
+      if (uploadAbortController) uploadAbortController.abort();
 
-      // 中断所有正在进行的上传请求
-      if (uploadAbortController) {
-        uploadAbortController.abort();
+      const statusBox = document.getElementById("upload-status");
+      if (!hashToCancel) {
+        statusBox.textContent = "无法清理临时文件（缺少哈希）";
+        return;
       }
-
-      const fileInput = document.getElementById('file-input');
-      if (!fileInput.files.length) return;
-
-      const file = fileInput.files[0];
-      const safeFileName = encodeURIComponent(file.name);
-      const fileHash = "mock_hash_" + safeFileName + "_" + file.size;
-
-      const statusBox = document.getElementById('upload-status');
-      statusBox.innerText = `正在回滚并指令后端清理临时碎块...`;
-
       try {
-        // 通知后端删除临时分片
-        await fetch(`${API_BASE}/upload/cancel?hash=${fileHash}`, {
-          method: 'DELETE',
-          headers: { 'Authorization': `Bearer ${jwtToken}` }
+        await fetch(`${API_BASE}/upload/cancel?hash=${hashToCancel}`, {
+          method: "DELETE",
+          headers: { Authorization: `Bearer ${jwtToken}` }
         });
-
-        statusBox.innerText = `隔离舱已爆破，连接状态释放`;
-        document.getElementById('progress-bar').style.width = '0%';
+        statusBox.textContent = "已请求清理临时分片";
+        document.getElementById("progress-bar").style.width = "0%";
       } catch (e) {
-        statusBox.innerText = `清理指令超时，服务端可能残留脏数据`;
+        statusBox.textContent = "清理请求失败";
       }
     }
 
-    // ==================== 更新上传进度 ====================
-    /**
-     * 更新进度条和状态文本
-     * @param {number} completed - 已完成分片数
-     * @param {number} total - 总分片数
-     */
     function updateProgress(completed, total) {
+      if (total <= 0) return;
       const percent = Math.round((completed / total) * 100);
-      document.getElementById('progress-bar').style.width = percent + '%';
-      document.getElementById('upload-status').innerText = `带宽压榨中: ${percent}%`;
+      document.getElementById("progress-bar").style.width = percent + "%";
+      document.getElementById("upload-status").textContent = `上传进度 ${percent}%`;
     }
 
-    // ==================== 解锁上传UI ====================
-    /**
-     * 重置上传按钮状态
-     */
     function unlockUploadUI() {
       isUploading = false;
-      document.getElementById('btn-upload').disabled = false;
-      document.getElementById('btn-cancel').disabled = true;
+      currentUploadFileHash = null;
+      document.getElementById("btn-upload").disabled = false;
+      document.getElementById("btn-cancel").disabled = true;
     }
 
     window.onload = init;

@@ -54,6 +54,9 @@
             msgBox.innerText = "注册成功，请登录系统";
           } else {
             localStorage.setItem("lan_im_token", data.token);
+            if (data.user) {
+              localStorage.setItem("lan_im_user", JSON.stringify(data.user));
+            }
             msgBox.style.color = "#2ecc71";
             msgBox.innerText = "登录成功，正在跳转...";
             setTimeout(() => window.location.href = "public.html", 500);
