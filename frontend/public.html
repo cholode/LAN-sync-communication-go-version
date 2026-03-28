@@ -250,9 +250,31 @@
     .profile-lines .name { font-weight: 600; font-size: 15px; }
     .profile-lines .sub { font-size: 12px; color: var(--muted); margin-top: 2px; }
     .member-list {
-      max-height: 220px;
       overflow-y: auto;
       font-size: 13px;
+    }
+    .aside-members-panel {
+      margin-top: auto;
+      border-top: 2px solid var(--border);
+      flex: 1 1 auto;
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+    }
+    .aside-members-panel .member-list {
+      flex: 1 1 auto;
+      min-height: 140px;
+      max-height: min(48vh, 420px);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 4px 0;
+      background: rgba(0,0,0,0.2);
+    }
+    .members-room-hint {
+      font-size: 12px;
+      color: var(--muted);
+      margin: 0 0 10px;
+      line-height: 1.35;
     }
     .member-item {
       padding: 8px 10px;
@@ -323,17 +345,6 @@
       </div>
 
       <div class="aside-block">
-        <h3>群成员</h3>
-        <div class="member-list" id="member-list">
-          <div style="color:var(--muted);font-size:13px;">选择群聊后显示成员列表</div>
-        </div>
-        <div class="flex-row" style="margin-top:12px;">
-          <input type="number" id="kick-user-id" placeholder="用户 ID（退群填自己）" style="margin-bottom:0;">
-          <button type="button" class="primary danger" onclick="removeMember()">移除</button>
-        </div>
-      </div>
-
-      <div class="aside-block">
         <h3>搜索我的群聊</h3>
         <input type="search" id="room-search" placeholder="按名称筛选…" oninput="filterRoomList()">
         <p class="hint">仅筛选你已加入的群；若需加入新群，使用下方群 ID。</p>
@@ -357,6 +368,18 @@
         <div class="hint" id="upload-status">选择文件后可上传</div>
         <div class="progress-bg"><div id="progress-bar"></div></div>
       </div>
+
+      <div class="aside-block aside-members-panel">
+        <h3>本群全部成员</h3>
+        <p class="members-room-hint" id="members-room-hint">请先在左侧选择一个群聊</p>
+        <div class="member-list" id="member-list">
+          <div style="color:var(--muted);font-size:13px;padding:8px 12px;">选择群聊后此处列出该群所有成员</div>
+        </div>
+        <div class="flex-row" style="margin-top:12px;">
+          <input type="number" id="kick-user-id" placeholder="用户 ID（退群填自己）" style="margin-bottom:0;">
+          <button type="button" class="primary danger" onclick="removeMember()">移除</button>
+        </div>
+      </div>
     </aside>
   </div>
 
@@ -379,7 +402,7 @@
 
     let allRooms = [];
     const loadedMessageIds = new Set();
-    let historyNextCursor = 0;
+    let historyNextCursor = "0";
     let historyHasMore = false;
     let historyLoading = false;
     let selfUserId = null;
@@ -636,8 +659,8 @@
 
     function insertMessageNode(msg, kind) {
       const id = msg.id != null ? msg.id : msg.ID;
-      if (id != null && loadedMessageIds.has(id)) return false;
-      if (id != null) loadedMessageIds.add(id);
+      if (id != null && loadedMessageIds.has(String(id))) return false;
+      if (id != null) loadedMessageIds.add(String(id));
 
       const box = getChatBox();
       box.dataset.empty = "0";
@@ -659,8 +682,8 @@
       const frag = document.createDocumentFragment();
       for (const msg of msgs) {
         const id = msg.id != null ? msg.id : msg.ID;
-        if (id != null && loadedMessageIds.has(id)) continue;
-        if (id != null) loadedMessageIds.add(id);
+        if (id != null && loadedMessageIds.has(String(id))) continue;
+        if (id != null) loadedMessageIds.add(String(id));
         const sid = msg.sender_id != null ? msg.sender_id : msg.SenderID;
         const own = selfUserId != null && Number(sid) === selfUserId;
         const wrap = document.createElement("div");
@@ -673,7 +696,7 @@
     }
 
     function resetChatArea() {
-      historyNextCursor = 0;
+      historyNextCursor = "0";
       historyHasMore = false;
       historyLoading = false;
       loadedMessageIds.clear();
@@ -710,10 +733,13 @@
           headers: { Authorization: `Bearer ${jwtToken}` }
         });
         const data = await res.json();
+        // #region agent log
+        fetch('http://127.0.0.1:7929/ingest/210e3fd0-ebfd-4f99-8c56-23d76fe0a613',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'3c90a5'},body:JSON.stringify({sessionId:'3c90a5',location:'public.html:loadInitialHistory',message:'messages cursor=0',data:{roomId:currentRoomId,status:res.status,ok:res.ok,msgCount:Array.isArray(data.messages)?data.messages.length:null,err:data&&data.error?String(data.error).slice(0,80):null},timestamp:Date.now(),hypothesisId:'H4'})}).catch(function(){});
+        // #endregion
         if (!res.ok) throw new Error(data.error || "加载失败");
 
         const msgs = data.messages || [];
-        historyNextCursor = data.next_cursor || 0;
+        historyNextCursor = data.next_cursor != null && data.next_cursor !== "" ? String(data.next_cursor) : "0";
         historyHasMore = !!data.has_more;
 
         const ph = document.getElementById("chat-box");
@@ -726,7 +752,7 @@
 
         for (const msg of msgs) {
           const id = msg.id != null ? msg.id : msg.ID;
-          if (id != null) loadedMessageIds.add(id);
+          if (id != null) loadedMessageIds.add(String(id));
           const sid = msg.sender_id != null ? msg.sender_id : msg.SenderID;
           const own = selfUserId != null && Number(sid) === selfUserId;
           const wrap = document.createElement("div");
@@ -748,7 +774,7 @@
     }
 
     async function loadOlderHistory() {
-      if (!currentRoomId || !historyHasMore || historyLoading || historyNextCursor <= 0) return;
+      if (!currentRoomId || !historyHasMore || historyLoading || !historyNextCursor || historyNextCursor === "0") return;
       historyLoading = true;
       document.getElementById("history-hint").textContent = "加载更早消息…";
       try {
@@ -760,7 +786,7 @@
         if (!res.ok) throw new Error(data.error || "加载失败");
 
         const msgs = data.messages || [];
-        historyNextCursor = data.next_cursor || 0;
+        historyNextCursor = data.next_cursor != null && data.next_cursor !== "" ? String(data.next_cursor) : "0";
         historyHasMore = !!data.has_more;
 
         prependMessages(msgs, "hist");
@@ -800,6 +826,9 @@
           headers: { Authorization: `Bearer ${jwtToken}` }
         });
         const data = await res.json();
+        // #region agent log
+        fetch('http://127.0.0.1:7929/ingest/210e3fd0-ebfd-4f99-8c56-23d76fe0a613',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'3c90a5'},body:JSON.stringify({sessionId:'3c90a5',location:'public.html:loadMyRooms',message:'my_rooms response',data:{status:res.status,ok:res.ok,hasToken:!!(jwtToken&&String(jwtToken).length>20),roomsLen:Array.isArray(data.rooms)?data.rooms.length:null,errKey:data&&data.error?String(data.error).slice(0,80):null},timestamp:Date.now(),hypothesisId:'H1'})}).catch(function(){});
+        // #endregion
         if (!res.ok) {
           listObj.innerHTML = `<div style="color:#e74c3c;text-align:center;padding:16px;">加载失败</div>`;
           return;
@@ -820,6 +849,9 @@
         });
         filterRoomList();
       } catch (e) {
+        // #region agent log
+        fetch('http://127.0.0.1:7929/ingest/210e3fd0-ebfd-4f99-8c56-23d76fe0a613',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'3c90a5'},body:JSON.stringify({sessionId:'3c90a5',location:'public.html:loadMyRooms:catch',message:'fetch exception',data:{name:e&&e.name,msg:e&&String(e.message).slice(0,120)},timestamp:Date.now(),hypothesisId:'H2'})}).catch(function(){});
+        // #endregion
         listObj.innerHTML = `<div style="color:#e74c3c;text-align:center;">网络异常</div>`;
       }
     }
@@ -842,23 +874,35 @@
 
     async function refreshMembers() {
       const container = document.getElementById("member-list");
+      const hint = document.getElementById("members-room-hint");
       if (!currentRoomId) {
-        container.innerHTML = `<div style="color:var(--muted);font-size:13px;">选择群聊后显示成员列表</div>`;
+        if (hint) hint.textContent = "请先在左侧选择一个群聊";
+        container.innerHTML = `<div style="color:var(--muted);font-size:13px;padding:8px 12px;">选择群聊后此处列出该群所有成员</div>`;
         return;
       }
-      container.innerHTML = `<div style="color:var(--muted);">加载中…</div>`;
+      if (hint) {
+        hint.textContent = `当前群：${currentRoomName ? "# " + currentRoomName : "群聊"}（ID ${currentRoomId}）· 共加载中…`;
+      }
+      container.innerHTML = `<div style="color:var(--muted);padding:8px 12px;">加载中…</div>`;
       try {
         const res = await fetch(`${API_BASE}/rooms/${currentRoomId}/members`, {
           headers: { Authorization: `Bearer ${jwtToken}` }
         });
         const data = await res.json();
+        // #region agent log
+        fetch('http://127.0.0.1:7929/ingest/210e3fd0-ebfd-4f99-8c56-23d76fe0a613',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'3c90a5'},body:JSON.stringify({sessionId:'3c90a5',location:'public.html:refreshMembers',message:'members response',data:{roomId:currentRoomId,status:res.status,ok:res.ok,memCount:Array.isArray(data.members)?data.members.length:null,err:data&&data.error?String(data.error).slice(0,80):null},timestamp:Date.now(),hypothesisId:'H4'})}).catch(function(){});
+        // #endregion
         if (!res.ok) {
-          container.innerHTML = `<div style="color:#e74c3c;font-size:13px;">${escapeHtml(data.error || "无权限")}</div>`;
+          if (hint) hint.textContent = `当前群：ID ${currentRoomId}（加载失败）`;
+          container.innerHTML = `<div style="color:#e74c3c;font-size:13px;padding:8px 12px;">${escapeHtml(data.error || "无权限")}</div>`;
           return;
         }
         const members = data.members || [];
+        if (hint) {
+          hint.textContent = `当前群：${currentRoomName ? "# " + currentRoomName : "群聊"}（ID ${currentRoomId}）· 共 ${members.length} 人`;
+        }
         if (!members.length) {
-          container.innerHTML = `<div style="color:var(--muted);">暂无成员数据</div>`;
+          container.innerHTML = `<div style="color:var(--muted);padding:8px 12px;">暂无成员数据</div>`;
           return;
         }
         container.innerHTML = "";
@@ -871,7 +915,8 @@
           container.appendChild(row);
         });
       } catch (e) {
-        container.innerHTML = `<div style="color:#e74c3c;">请求失败</div>`;
+        if (hint) hint.textContent = `当前群：ID ${currentRoomId}（请求异常）`;
+        container.innerHTML = `<div style="color:#e74c3c;padding:8px 12px;">请求失败</div>`;
       }
     }
 

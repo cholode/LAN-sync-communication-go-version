@@ -1,6 +1,7 @@
 package api
 
 import (
+	"fmt"
 	"github.com/gin-gonic/gin"
 	"lan-im-go/core"
 	"lan-im-go/models"
@@ -115,6 +116,13 @@ func GetRoomMembers() gin.HandlerFunc {
 
 		// 查询群成员信息
 		users, err := repository.RoomMember.GetRoomMembers(roomID)
+		// #region agent log
+		errPl := ""
+		if err != nil {
+			errPl = err.Error()
+		}
+		agentDebugLog("H4-verify", "room_handler.go:GetRoomMembers:afterRepo", "member query", map[string]any{"roomID": roomID, "count": len(users), "err": errPl})
+		// #endregion
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "获取成员列表失败"})
 			return
@@ -190,11 +198,25 @@ func CreateRoom(hub *core.Hub) gin.HandlerFunc {
 // 路由：GET /api/v1/my_rooms
 func GetMyRooms() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		userIDVal, _ := c.Get("user_id")
+		userIDVal, uidOk := c.Get("user_id")
+		// #region agent log
+		typeStr := ""
+		if userIDVal != nil {
+			typeStr = fmt.Sprintf("%T", userIDVal)
+		}
+		agentDebugLog("H6", "room_handler.go:GetMyRooms:entry", "user_id from context", map[string]any{"hasUserID": uidOk, "goType": typeStr})
+		// #endregion
 		userID := userIDVal.(int64)
 
 		// 查询用户加入的群聊列表
 		rooms, err := repository.Room.GetJoinedRooms(userID)
+		// #region agent log
+		errStr := ""
+		if err != nil {
+			errStr = err.Error()
+		}
+		agentDebugLog("H3", "room_handler.go:GetMyRooms:afterQuery", "GetJoinedRooms", map[string]any{"userID": userID, "err": errStr, "count": len(rooms)})
+		// #endregion
 		if err != nil {
 			log.Printf("查询群聊列表失败: %v\n", err)
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "获取群聊列表失败"})

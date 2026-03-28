@@ -30,14 +30,11 @@ func (r *messageRepoImpl) SaveMessageBatch(msgs []*models.Message) error {
 // GetHistoryByCursor 基于游标分页查询历史消息
 func (r *messageRepoImpl) GetHistoryByCursor(roomID int64, cursorMsgID int64, limit int) ([]*models.Message, error) {
 	var messages []*models.Message
-	// 1. 基础查询条件，匹配群聊ID索引
-	query := r.db.Where("room_id = ?", roomID)
-	// 2. 游标条件：游标大于0时，查询更早的历史消息
-	// 游标为0时，查询最新消息
+	// 必须 Model(&Message{})，否则消息表毫秒软删条件可能未加入，或 Statement 不完整导致查询异常
+	query := r.db.Model(&models.Message{}).Where("room_id = ?", roomID)
 	if cursorMsgID > 0 {
 		query = query.Where("id < ?", cursorMsgID)
 	}
-	// 3. 按消息ID倒序查询，匹配数据库索引，提升查询效率
 	err := query.Order("id DESC").Limit(limit).Find(&messages).Error
 
 	for i, j := 0, len(messages)-1; i < j; i, j = i+1, j-1 {

@@ -56,11 +56,17 @@ func (r *roomMemberRepoImpl) CheckIsMember(roomID, userID64 int64) (bool, error)
 }
 
 func (r *roomMemberRepoImpl) GetRoomMembers(roomID int64) ([]*models.User, error) {
+	var userIDs []int64
+	// 使用 Model(RoomMember) 由 GORM 自动排除 room_members 的软删行；勿手写 users.deleted_at IS NULL（毫秒软删为 0 非 NULL）
+	if err := r.db.Model(&models.RoomMember{}).Where("room_id = ?", roomID).Pluck("user_id", &userIDs).Error; err != nil {
+		return nil, err
+	}
+	if len(userIDs) == 0 {
+		return []*models.User{}, nil
+	}
 	var users []*models.User
-	err := r.db.Table("users").
-		Select("users.*").
-		Joins("INNER JOIN room_members ON users.id = room_members.user_id").
-		Where("room_members.room_id = ? AND users.deleted_at IS NULL", roomID).
-		Find(&users).Error
-	return users, err
+	if err := r.db.Where("id IN ?", userIDs).Find(&users).Error; err != nil {
+		return nil, err
+	}
+	return users, nil
 }
