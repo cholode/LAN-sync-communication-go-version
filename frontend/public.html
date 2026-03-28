@@ -2,25 +2,34 @@
 <html lang="zh-CN">
 <head>
   <meta charset="UTF-8">
-  <title>LAN-IM</title>
+  <title>LAN-IM - 局域网即时通讯系统</title>
   <style>
     :root {
-      --bg: #0f0f0f;
-      --panel: #171717;
-      --panel2: #1f1f1f;
-      --border: #2a2a2a;
-      --text: #e8e8e8;
-      --muted: #888;
-      --accent: #0e639c;
-      --accent-hover: #1177bb;
-      --msg-own: #264f78;
-      --msg-other: #2d2d2d;
-      --danger: #c0392b;
+      /* 科技风格基础配色 */
+      --bg: #020813;
+      --panel: rgba(6, 18, 36, 0.85);
+      --panel2: rgba(10, 30, 56, 0.6);
+      --border: #00d2ff;
+      --border-dim: #005c8a;
+      --text: #e0f2fe;
+      --muted: #00a8cc;
+      --accent: #00f0ff;
+      --accent-hover: #00ffff;
+      --msg-own: rgba(0, 208, 255, 0.15);
+      --msg-other: rgba(10, 30, 56, 0.8);
+      --danger: #ff003c;
+      --glow: 0 0 10px rgba(0, 210, 255, 0.4);
+      --glow-strong: 0 0 15px rgba(0, 240, 255, 0.7);
     }
     * { box-sizing: border-box; }
     body {
-      font-family: 'Segoe UI', system-ui, sans-serif;
-      background: var(--bg);
+      font-family: 'Consolas', 'Courier New', 'Segoe UI', system-ui, sans-serif;
+      background-color: var(--bg);
+      /* 添加网格线背景增强科技感 */
+      background-image: 
+        linear-gradient(rgba(0, 210, 255, 0.03) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(0, 210, 255, 0.03) 1px, transparent 1px);
+      background-size: 20px 20px;
       color: var(--text);
       margin: 0;
       height: 100vh;
@@ -33,13 +42,25 @@
       min-height: 52px;
       background: var(--panel);
       border-bottom: 1px solid var(--border);
+      box-shadow: 0 2px 10px rgba(0, 210, 255, 0.1);
       display: flex;
       align-items: center;
       justify-content: space-between;
       padding: 0 20px;
       flex-shrink: 0;
+      position: relative;
     }
-    .topbar-brand { font-weight: 600; font-size: 15px; color: var(--accent); letter-spacing: 0.02em; }
+    .topbar::after {
+      content: '';
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      width: 100%;
+      height: 1px;
+      background: var(--accent);
+      box-shadow: var(--glow-strong);
+    }
+    .topbar-brand { font-weight: 700; font-size: 16px; color: var(--accent); letter-spacing: 0.1em; text-transform: uppercase; text-shadow: var(--glow); }
     .topbar-user {
       display: flex;
       align-items: center;
@@ -47,18 +68,21 @@
       font-size: 13px;
     }
     .topbar-user-meta { text-align: right; line-height: 1.35; }
-    .topbar-user-name { font-weight: 600; }
+    .topbar-user-name { font-weight: 600; color: var(--accent); }
     .topbar-user-id { color: var(--muted); font-size: 12px; }
     .btn-ghost {
-      padding: 8px 14px;
-      background: transparent;
-      border: 1px solid var(--border);
-      color: var(--text);
-      border-radius: 6px;
+      padding: 6px 14px;
+      background: rgba(0, 210, 255, 0.05);
+      border: 1px solid var(--border-dim);
+      color: var(--accent);
+      border-radius: 2px;
       cursor: pointer;
-      font-size: 13px;
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      transition: all 0.2s;
     }
-    .btn-ghost:hover { background: var(--panel2); }
+    .btn-ghost:hover { background: rgba(0, 210, 255, 0.15); border-color: var(--accent); box-shadow: var(--glow); }
     .app-body {
       flex: 1;
       display: flex;
@@ -68,62 +92,73 @@
       width: 280px;
       min-width: 240px;
       background: var(--panel);
-      border-right: 1px solid var(--border);
+      border-right: 1px solid var(--border-dim);
       display: flex;
       flex-direction: column;
       min-height: 0;
+      box-shadow: 2px 0 10px rgba(0,0,0,0.5);
     }
     .sidebar-head {
       padding: 14px 16px;
-      border-bottom: 1px solid var(--border);
-      font-size: 13px;
+      border-bottom: 1px solid var(--border-dim);
+      font-size: 12px;
       font-weight: 600;
-      color: var(--muted);
+      color: var(--accent);
       text-transform: uppercase;
-      letter-spacing: 0.06em;
+      letter-spacing: 0.1em;
     }
     .room-list {
       flex: 1;
       overflow-y: auto;
       padding: 10px 12px;
     }
+    /* 滚动条样式定制 */
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: rgba(0, 0, 0, 0.3); }
+    ::-webkit-scrollbar-thumb { background: var(--border-dim); border-radius: 3px; }
+    ::-webkit-scrollbar-thumb:hover { background: var(--accent); }
+
     .room-item {
       padding: 12px 14px;
       margin-bottom: 6px;
       background: var(--panel2);
-      border-radius: 8px;
+      border-radius: 2px;
       cursor: pointer;
-      border: 1px solid transparent;
-      transition: 0.15s;
+      border: 1px solid var(--border-dim);
+      border-left: 3px solid transparent;
+      transition: all 0.15s;
     }
-    .room-item:hover { background: #252525; }
+    .room-item:hover { background: rgba(0, 210, 255, 0.05); border-color: var(--accent); border-left-color: var(--accent); }
     .room-item.active {
       border-color: var(--accent);
-      background: #1a2834;
+      border-left: 3px solid var(--accent);
+      background: rgba(0, 210, 255, 0.1);
+      box-shadow: inset 0 0 10px rgba(0, 210, 255, 0.2);
     }
     .room-item.hidden { display: none; }
-    .room-name { font-weight: 600; font-size: 14px; }
-    .room-id { font-size: 12px; color: var(--muted); margin-top: 4px; }
+    .room-name { font-weight: 600; font-size: 14px; color: #fff; }
+    .room-id { font-size: 11px; color: var(--muted); margin-top: 4px; font-family: monospace; }
     .main-view {
       flex: 1;
       display: flex;
       flex-direction: column;
       min-width: 0;
       min-height: 0;
-      background: #141414;
+      background: transparent;
     }
     .chat-header {
       height: 56px;
       min-height: 56px;
       padding: 0 20px;
-      border-bottom: 1px solid var(--border);
+      border-bottom: 1px solid var(--border-dim);
       display: flex;
       align-items: center;
       font-weight: 600;
       font-size: 15px;
       background: var(--panel);
+      text-shadow: 0 0 5px rgba(255,255,255,0.3);
     }
-    .chat-header-sub { font-size: 12px; color: var(--muted); font-weight: 400; margin-top: 2px; }
+    .chat-header-sub { font-size: 12px; color: var(--muted); font-weight: 400; margin-top: 2px; font-family: monospace; }
     .chat-wrap {
       flex: 1;
       min-height: 0;
@@ -133,10 +168,12 @@
     }
     .chat-history-hint {
       text-align: center;
-      font-size: 12px;
+      font-size: 11px;
       color: var(--muted);
       padding: 8px;
       min-height: 28px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
     }
     #chat-box {
       flex: 1;
@@ -144,7 +181,7 @@
       padding: 16px 20px;
       display: flex;
       flex-direction: column;
-      gap: 10px;
+      gap: 12px;
     }
     .chat-placeholder {
       flex: 1;
@@ -152,28 +189,39 @@
       align-items: center;
       justify-content: center;
       color: var(--muted);
-      font-size: 14px;
+      font-size: 13px;
       padding: 40px;
       text-align: center;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
     }
     .msg-row { display: flex; flex-direction: column; max-width: 85%; }
     .msg-row.own { align-self: flex-end; align-items: flex-end; }
     .msg-row.other { align-self: flex-start; }
-    .msg-meta { font-size: 11px; color: var(--muted); margin-bottom: 4px; padding: 0 4px; }
+    .msg-meta { font-size: 11px; color: var(--muted); margin-bottom: 4px; padding: 0 4px; font-family: monospace; }
     .msg-bubble {
       padding: 10px 14px;
-      border-radius: 12px;
+      border-radius: 2px;
       font-size: 14px;
       line-height: 1.45;
       word-break: break-word;
+      border: 1px solid transparent;
+      font-family: 'Segoe UI', sans-serif;
     }
-    .msg-row.own .msg-bubble { background: var(--msg-own); border-bottom-right-radius: 4px; }
-    .msg-row.other .msg-bubble { background: var(--msg-other); border-bottom-left-radius: 4px; }
-    .msg-row.sys .msg-bubble { background: transparent; color: #f39c12; font-size: 13px; padding: 4px 0; }
-    .msg-row.err .msg-bubble { background: transparent; color: var(--danger); font-size: 13px; }
-    .msg-row.hist .msg-bubble { opacity: 0.85; }
-    .msg-bubble .msg-link { color: #6cb3f2; text-decoration: underline; word-break: break-all; }
-    .msg-bubble .msg-link:hover { color: #9dcbf5; }
+    .msg-row.own .msg-bubble { 
+      background: var(--msg-own); 
+      border-color: var(--accent);
+      box-shadow: 0 0 5px rgba(0, 210, 255, 0.2);
+    }
+    .msg-row.other .msg-bubble { 
+      background: var(--msg-other); 
+      border-color: var(--border-dim);
+    }
+    .msg-row.sys .msg-bubble { background: rgba(243, 156, 18, 0.1); border-color: #f39c12; color: #f39c12; font-size: 12px; padding: 4px 10px; text-transform: uppercase; }
+    .msg-row.err .msg-bubble { background: rgba(255, 0, 60, 0.1); border-color: var(--danger); color: var(--danger); font-size: 12px; }
+    .msg-row.hist .msg-bubble { opacity: 0.7; }
+    .msg-bubble .msg-link { color: var(--accent); text-decoration: none; border-bottom: 1px dashed var(--accent); word-break: break-all; }
+    .msg-bubble .msg-link:hover { color: var(--accent-hover); text-shadow: var(--glow); }
     .input-area {
       padding: 14px 20px;
       background: var(--panel);
@@ -181,53 +229,82 @@
       display: flex;
       gap: 10px;
       flex-shrink: 0;
+      position: relative;
     }
-    input[type="text"], input[type="number"], input[type="search"] {
+    .input-area::before {
+      content: '';
+      position: absolute;
+      top: -1px;
+      left: 0;
+      width: 100%;
+      height: 1px;
+      background: var(--accent);
+      box-shadow: var(--glow-strong);
+    }
+    input[type="text"], input[type="number"], input[type="search"], input[type="file"] {
       flex: 1;
       padding: 11px 14px;
-      background: var(--panel2);
-      border: 1px solid var(--border);
+      background: rgba(0, 0, 0, 0.5);
+      border: 1px solid var(--border-dim);
       color: var(--text);
-      border-radius: 8px;
+      border-radius: 2px;
       outline: none;
       font-size: 14px;
+      font-family: monospace;
+      transition: all 0.2s;
     }
-    input:focus { border-color: var(--accent); }
+    input:focus { border-color: var(--accent); box-shadow: var(--glow) inset; background: rgba(0, 210, 255, 0.05); }
     button.primary {
       padding: 11px 20px;
-      background: var(--accent);
-      color: #fff;
-      border: none;
-      border-radius: 8px;
+      background: rgba(0, 210, 255, 0.1);
+      color: var(--accent);
+      border: 1px solid var(--accent);
+      border-radius: 2px;
       cursor: pointer;
       font-weight: 600;
-      font-size: 14px;
+      font-size: 13px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      transition: all 0.2s;
     }
-    button.primary:hover { background: var(--accent-hover); }
-    button.primary:disabled { opacity: 0.45; cursor: not-allowed; }
-    button.danger { background: var(--danger); }
-    button.danger:hover { filter: brightness(1.08); }
+    button.primary:hover:not(:disabled) { 
+      background: var(--accent); 
+      color: #000; 
+      box-shadow: var(--glow-strong); 
+    }
+    button.primary:disabled { border-color: var(--border-dim); color: var(--border-dim); opacity: 0.5; cursor: not-allowed; }
+    button.danger { border-color: var(--danger); color: var(--danger); background: rgba(255, 0, 60, 0.05); }
+    button.danger:hover:not(:disabled) { background: var(--danger); color: #fff; box-shadow: 0 0 15px rgba(255, 0, 60, 0.5); }
     .aside {
       width: 320px;
       min-width: 280px;
       background: var(--panel);
-      border-left: 1px solid var(--border);
+      border-left: 1px solid var(--border-dim);
       overflow-y: auto;
       display: flex;
       flex-direction: column;
       gap: 0;
+      box-shadow: -2px 0 10px rgba(0,0,0,0.5);
     }
     .aside-block {
       padding: 16px 18px;
-      border-bottom: 1px solid var(--border);
+      border-bottom: 1px solid var(--border-dim);
     }
     .aside-block h3 {
       margin: 0 0 12px;
-      font-size: 12px;
+      font-size: 11px;
       font-weight: 600;
-      color: var(--muted);
+      color: var(--accent);
       text-transform: uppercase;
-      letter-spacing: 0.06em;
+      letter-spacing: 0.1em;
+      display: flex;
+      align-items: center;
+    }
+    .aside-block h3::before {
+      content: '>';
+      margin-right: 6px;
+      color: var(--danger);
+      font-family: monospace;
     }
     .profile-card {
       display: flex;
@@ -237,25 +314,29 @@
     .profile-avatar {
       width: 48px;
       height: 48px;
-      border-radius: 10px;
-      background: linear-gradient(135deg, #264f78, #1a3a5c);
+      border-radius: 2px;
+      background: rgba(0, 210, 255, 0.1);
+      border: 1px solid var(--accent);
       display: flex;
       align-items: center;
       justify-content: center;
       font-weight: 700;
       font-size: 18px;
+      color: var(--accent);
       flex-shrink: 0;
+      box-shadow: inset 0 0 10px rgba(0, 210, 255, 0.2);
     }
     .profile-lines { min-width: 0; }
-    .profile-lines .name { font-weight: 600; font-size: 15px; }
-    .profile-lines .sub { font-size: 12px; color: var(--muted); margin-top: 2px; }
+    .profile-lines .name { font-weight: 600; font-size: 15px; color: #fff; }
+    .profile-lines .sub { font-size: 11px; color: var(--muted); margin-top: 2px; font-family: monospace; }
     .member-list {
       overflow-y: auto;
-      font-size: 13px;
+      font-size: 12px;
+      font-family: monospace;
     }
     .aside-members-panel {
       margin-top: auto;
-      border-top: 2px solid var(--border);
+      border-top: 1px solid var(--border-dim);
       flex: 1 1 auto;
       min-height: 0;
       display: flex;
@@ -265,39 +346,41 @@
       flex: 1 1 auto;
       min-height: 140px;
       max-height: min(48vh, 420px);
-      border: 1px solid var(--border);
-      border-radius: 8px;
+      border: 1px solid var(--border-dim);
+      border-radius: 2px;
       padding: 4px 0;
-      background: rgba(0,0,0,0.2);
+      background: rgba(0,0,0,0.3);
     }
     .members-room-hint {
-      font-size: 12px;
+      font-size: 11px;
       color: var(--muted);
       margin: 0 0 10px;
       line-height: 1.35;
     }
     .member-item {
       padding: 8px 10px;
-      border-radius: 6px;
+      border-radius: 0;
       display: flex;
       justify-content: space-between;
       gap: 8px;
+      border-left: 2px solid transparent;
     }
-    .member-item:nth-child(odd) { background: rgba(255,255,255,0.03); }
-    .member-name { font-weight: 500; }
-    .member-id { color: var(--muted); font-size: 12px; }
+    .member-item:nth-child(odd) { background: rgba(0, 210, 255, 0.02); }
+    .member-item:hover { background: rgba(0, 210, 255, 0.08); border-left-color: var(--accent); }
+    .member-name { font-weight: 500; color: #fff; }
+    .member-id { color: var(--muted); font-size: 11px; }
     .flex-row { display: flex; gap: 8px; margin-bottom: 10px; }
     .flex-row:last-child { margin-bottom: 0; }
     .flex-row input { min-width: 0; }
     .flex-row button { flex-shrink: 0; white-space: nowrap; }
-    #progress-bar { height: 6px; background: #8e44ad; width: 0%; border-radius: 3px; transition: width 0.2s; }
-    .progress-bg { background: var(--border); border-radius: 3px; margin-top: 8px; overflow: hidden; height: 6px; }
-    .hint { font-size: 12px; color: var(--muted); margin-top: 8px; line-height: 1.4; }
+    #progress-bar { height: 4px; background: var(--accent); width: 0%; box-shadow: var(--glow-strong); transition: width 0.2s; }
+    .progress-bg { background: rgba(0,0,0,0.5); border: 1px solid var(--border-dim); margin-top: 8px; overflow: hidden; height: 6px; }
+    .hint { font-size: 11px; color: var(--muted); margin-top: 8px; line-height: 1.4; font-family: monospace; }
   </style>
 </head>
 <body>
   <header class="topbar">
-    <div class="topbar-brand">LAN-IM</div>
+    <div class="topbar-brand">LAN-IM 局域网即时通讯</div>
     <div class="topbar-user">
       <div class="topbar-user-meta">
         <div class="topbar-user-name" id="top-username">用户</div>
@@ -311,20 +394,20 @@
     <aside class="sidebar">
       <div class="sidebar-head">群聊列表</div>
       <div class="room-list" id="room-list">
-        <div style="color:var(--muted);text-align:center;padding:20px;">正在加载…</div>
+        <div style="color:var(--muted);text-align:center;padding:20px;font-family:monospace;">加载中...</div>
       </div>
     </aside>
 
     <section class="main-view">
       <div class="chat-header">
         <div>
-          <div id="current-room-title">选择左侧群聊开始聊天</div>
+          <div id="current-room-title">请选择群聊</div>
           <div class="chat-header-sub" id="current-room-sub"></div>
         </div>
       </div>
       <div class="chat-wrap" id="chat-wrap">
         <div class="chat-history-hint" id="history-hint"></div>
-        <div id="chat-box" class="chat-placeholder" data-empty="1">从左侧选择一个群聊，消息将显示在此处。<br>在聊天记录中向上滑动可自动加载更早的消息。</div>
+        <div id="chat-box" class="chat-placeholder" data-empty="1">请选择左侧群聊开始聊天<br>向上滚动加载历史消息</div>
       </div>
       <div class="input-area">
         <input type="text" id="msg-content" placeholder="输入消息，Enter 发送" onkeypress="handleEnter(event)" disabled>
@@ -339,53 +422,94 @@
           <div class="profile-avatar" id="aside-avatar">?</div>
           <div class="profile-lines">
             <div class="name" id="aside-username">—</div>
-            <div class="sub" id="aside-userdetail">登录后可查看</div>
+            <div class="sub" id="aside-userdetail">未登录</div>
           </div>
         </div>
       </div>
 
       <div class="aside-block">
-        <h3>搜索我的群聊</h3>
-        <input type="search" id="room-search" placeholder="按名称筛选…" oninput="filterRoomList()">
-        <p class="hint">仅筛选你已加入的群；若需加入新群，使用下方群 ID。</p>
+        <h3>群聊搜索</h3>
+        <input type="search" id="room-search" placeholder="搜索群聊名称/ID">
+        <p class="hint">支持搜索已加入的群聊，可通过下方功能创建或加入新群聊</p>
         <div class="flex-row" style="margin-top:12px;">
-          <input type="text" id="new-room-name" placeholder="新群名称">
-          <button type="button" class="primary" onclick="createRoom()" style="background:#2d7a3e;">创建</button>
+          <input type="text" id="new-room-name" placeholder="群聊名称">
+          <button type="button" class="primary" onclick="createRoom()" style="border-color:#00ff88;color:#00ff88;background:rgba(0,255,136,0.05);">创建群聊</button>
         </div>
         <div class="flex-row">
-          <input type="number" id="join-room-id" placeholder="群 ID 加入">
-          <button type="button" class="primary" onclick="joinRoom()" style="background:#b8860b;">加入</button>
+          <input type="number" id="join-room-id" placeholder="群聊ID">
+          <button type="button" class="primary" onclick="joinRoom()" style="border-color:#ffb800;color:#ffb800;background:rgba(255,184,0,0.05);">加入群聊</button>
         </div>
       </div>
 
       <div class="aside-block">
-        <h3>文件</h3>
-        <input type="file" id="file-input" style="width:100%;margin-bottom:10px;background:var(--panel2);border:1px solid var(--border);border-radius:8px;padding:8px;color:var(--text);">
+        <h3>文件传输</h3>
+        <input type="file" id="file-input">
         <div class="flex-row">
-          <button type="button" class="primary" id="btn-upload" onclick="startUpload()" style="background:#7d3c98;flex:1;">上传</button>
-          <button type="button" class="primary danger" id="btn-cancel" onclick="cancelUpload()" style="flex:1;" disabled>取消</button>
+          <button type="button" class="primary" id="btn-upload" onclick="startUpload()" style="border-color:#b400ff;color:#b400ff;background:rgba(180,0,255,0.05);flex:1;">上传文件</button>
+          <button type="button" class="primary danger" id="btn-cancel" onclick="cancelUpload()" style="flex:1;" disabled>取消上传</button>
         </div>
-        <div class="hint" id="upload-status">选择文件后可上传</div>
+        <div class="hint" id="upload-status">等待上传</div>
         <div class="progress-bg"><div id="progress-bar"></div></div>
       </div>
 
       <div class="aside-block aside-members-panel">
-        <h3>本群全部成员</h3>
-        <p class="members-room-hint" id="members-room-hint">请先在左侧选择一个群聊</p>
+        <h3>群成员</h3>
+        <p class="members-room-hint" id="members-room-hint">请选择群聊查看成员</p>
         <div class="member-list" id="member-list">
-          <div style="color:var(--muted);font-size:13px;padding:8px 12px;">选择群聊后此处列出该群所有成员</div>
+          <div style="color:var(--muted);font-size:11px;padding:8px 12px;">暂无成员</div>
         </div>
         <div class="flex-row" style="margin-top:12px;">
-          <input type="number" id="kick-user-id" placeholder="用户 ID（退群填自己）" style="margin-bottom:0;">
-          <button type="button" class="primary danger" onclick="removeMember()">移除</button>
+          <input type="number" id="kick-user-id" placeholder="用户ID（退出群聊输入自己ID）" style="margin-bottom:0;">
+          <button type="button" class="primary danger" onclick="removeMember()">移除成员</button>
         </div>
+      </div>
+
+      <div class="aside-block aside-disband-panel" id="owner-disband-block" style="border-top:1px solid var(--border-dim);">
+        <h3>解散群聊</h3>
+        <p class="hint">警告：仅群主可操作，解散后群聊将被删除，所有成员将被移出</p>
+        <button type="button" class="primary danger" onclick="disbandCurrentRoom()" id="btn-disband-room" style="width:100%;" disabled>解散群聊</button>
       </div>
     </aside>
   </div>
 
   <script>
-    const API_BASE = "/api/v1";
-    const WS_BASE = "/api/v1/ws";
+    /**
+     * 与页面同源（nginx 反代 /api/、/api/v1/ws 时）保持为空字符串。
+     * 若静态站点与 API 不同机/不同端口，填后端根地址，例如 "http://192.168.1.10:8080"
+     */
+    const API_ORIGIN = "";
+    const API_BASE = (function () {
+      const o = (API_ORIGIN || "").replace(/\/+$/, "");
+      if (!o) return "/api/v1";
+      return o + "/api/v1";
+    })();
+    /** 局域网或 HTTPS 下 WebSocket 必须带原协议与 Host，不能写死 127.0.0.1 */
+    const WS_BASE = (function () {
+      const o = (API_ORIGIN || "").replace(/\/+$/, "");
+      if (!o) {
+        const scheme = location.protocol === "https:" ? "wss:" : "ws:";
+        return scheme + "//" + location.host + "/api/v1/ws";
+      }
+      try {
+        const base = o.includes("://") ? o : location.protocol + "//" + o;
+        const u = new URL(base);
+        const scheme = u.protocol === "https:" ? "wss:" : "ws:";
+        return scheme + "//" + u.host + "/api/v1/ws";
+      } catch (e) {
+        const scheme = location.protocol === "https:" ? "wss:" : "ws:";
+        return scheme + "//" + location.host + "/api/v1/ws";
+      }
+    })();
+
+    function agentDebugIngest(payload) {
+      if (location.hostname !== "localhost" && location.hostname !== "127.0.0.1") return;
+      fetch("http://127.0.0.1:7929/ingest/210e3fd0-ebfd-4f99-8c56-23d76fe0a613", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "3c90a5" },
+        body: JSON.stringify(Object.assign({ sessionId: "3c90a5" }, payload))
+      }).catch(function () {});
+    }
+
     const jwtToken = localStorage.getItem("lan_im_token");
 
     if (!jwtToken) {
@@ -406,6 +530,8 @@
     let historyHasMore = false;
     let historyLoading = false;
     let selfUserId = null;
+    let currentRoomCreatorId = null;
+    let currentMyRoleInRoom = 1;
 
     function parseJwtUserId(token) {
       try {
@@ -416,8 +542,21 @@
       }
     }
 
+    function canDisbandCurrentRoom() {
+      if (selfUserId == null || currentRoomId == null) return false;
+      if (Number(currentRoomCreatorId) === Number(selfUserId)) return true;
+      if (Number(currentMyRoleInRoom) === 3) return true;
+      return false;
+    }
+
+    function updateDisbandButtonState() {
+      const btnDisband = document.getElementById("btn-disband-room");
+      if (btnDisband) btnDisband.disabled = !canDisbandCurrentRoom();
+    }
+
     function loadUserProfile() {
       selfUserId = parseJwtUserId(jwtToken);
+      updateDisbandButtonState();
       let user = null;
       try {
         const raw = localStorage.getItem("lan_im_user");
@@ -734,7 +873,7 @@
         });
         const data = await res.json();
         // #region agent log
-        fetch('http://127.0.0.1:7929/ingest/210e3fd0-ebfd-4f99-8c56-23d76fe0a613',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'3c90a5'},body:JSON.stringify({sessionId:'3c90a5',location:'public.html:loadInitialHistory',message:'messages cursor=0',data:{roomId:currentRoomId,status:res.status,ok:res.ok,msgCount:Array.isArray(data.messages)?data.messages.length:null,err:data&&data.error?String(data.error).slice(0,80):null},timestamp:Date.now(),hypothesisId:'H4'})}).catch(function(){});
+        agentDebugIngest({ location: "public.html:loadInitialHistory", message: "messages cursor=0", data: { roomId: currentRoomId, status: res.status, ok: res.ok, msgCount: Array.isArray(data.messages) ? data.messages.length : null, err: data && data.error ? String(data.error).slice(0, 80) : null }, timestamp: Date.now(), hypothesisId: "H4" });
         // #endregion
         if (!res.ok) throw new Error(data.error || "加载失败");
 
@@ -827,7 +966,7 @@
         });
         const data = await res.json();
         // #region agent log
-        fetch('http://127.0.0.1:7929/ingest/210e3fd0-ebfd-4f99-8c56-23d76fe0a613',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'3c90a5'},body:JSON.stringify({sessionId:'3c90a5',location:'public.html:loadMyRooms',message:'my_rooms response',data:{status:res.status,ok:res.ok,hasToken:!!(jwtToken&&String(jwtToken).length>20),roomsLen:Array.isArray(data.rooms)?data.rooms.length:null,errKey:data&&data.error?String(data.error).slice(0,80):null},timestamp:Date.now(),hypothesisId:'H1'})}).catch(function(){});
+        agentDebugIngest({ location: "public.html:loadMyRooms", message: "my_rooms response", data: { status: res.status, ok: res.ok, hasToken: !!(jwtToken && String(jwtToken).length > 20), roomsLen: Array.isArray(data.rooms) ? data.rooms.length : null, errKey: data && data.error ? String(data.error).slice(0, 80) : null }, timestamp: Date.now(), hypothesisId: "H1" });
         // #endregion
         if (!res.ok) {
           listObj.innerHTML = `<div style="color:#e74c3c;text-align:center;padding:16px;">加载失败</div>`;
@@ -843,22 +982,25 @@
           const div = document.createElement("div");
           div.className = "room-item";
           div.dataset.roomName = room.room_name || "";
-          div.onclick = () => selectRoom(room.room_id, room.room_name, div);
+          div.onclick = () => selectRoom(room, div);
           div.innerHTML = `<div class="room-name"># ${escapeHtml(room.room_name)}</div><div class="room-id">ID: ${room.room_id}</div>`;
           listObj.appendChild(div);
         });
         filterRoomList();
       } catch (e) {
         // #region agent log
-        fetch('http://127.0.0.1:7929/ingest/210e3fd0-ebfd-4f99-8c56-23d76fe0a613',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'3c90a5'},body:JSON.stringify({sessionId:'3c90a5',location:'public.html:loadMyRooms:catch',message:'fetch exception',data:{name:e&&e.name,msg:e&&String(e.message).slice(0,120)},timestamp:Date.now(),hypothesisId:'H2'})}).catch(function(){});
+        agentDebugIngest({ location: "public.html:loadMyRooms:catch", message: "fetch exception", data: { name: e && e.name, msg: e && String(e.message).slice(0, 120) }, timestamp: Date.now(), hypothesisId: "H2" });
         // #endregion
         listObj.innerHTML = `<div style="color:#e74c3c;text-align:center;">网络异常</div>`;
       }
     }
 
-    async function selectRoom(id, name, element) {
+    async function selectRoom(room, element) {
+      const id = room.room_id;
       currentRoomId = id;
-      currentRoomName = name || "";
+      currentRoomName = room.room_name || "";
+      currentRoomCreatorId = room.creator_id != null ? room.creator_id : null;
+      currentMyRoleInRoom = room.my_role != null ? Number(room.my_role) : 1;
       document.getElementById("current-room-title").textContent = `# ${currentRoomName || "群聊"}`;
       document.getElementById("current-room-sub").textContent = `群 ID ${id}`;
       document.querySelectorAll(".room-item").forEach(el => el.classList.remove("active"));
@@ -869,7 +1011,58 @@
 
       resetChatArea();
       await Promise.all([loadInitialHistory(), refreshMembers()]);
+      updateDisbandButtonState();
       notifyLine(`已切换到群「${currentRoomName || id}」`, "sys");
+    }
+
+    async function disbandCurrentRoom() {
+      if (!canDisbandCurrentRoom()) {
+        alert("仅群主或创建者可解散该群。");
+        return;
+      }
+      if (!currentRoomId) {
+        alert("请先在左侧选择一个群聊。");
+        return;
+      }
+      const label = currentRoomName ? `「# ${currentRoomName}」` : `（ID ${currentRoomId}）`;
+      if (!confirm(`确定解散群 ${label}？\n该操作会软删除群聊并通知在线成员，且不可从前台恢复。`)) return;
+      const btn = document.getElementById("btn-disband-room");
+      if (btn) btn.disabled = true;
+      try {
+        const res = await fetch(`${API_BASE}/rooms/${currentRoomId}/disband`, {
+          method: "DELETE",
+          headers: { Authorization: `Bearer ${jwtToken}` }
+        });
+        let data = {};
+        try {
+          data = await res.json();
+        } catch (e) {}
+        if (!res.ok) {
+          alert(data.error || `解散失败（HTTP ${res.status}）`);
+          updateDisbandButtonState();
+          return;
+        }
+        alert(data.msg || "群聊已解散");
+        const rid = currentRoomId;
+        currentRoomId = null;
+        currentRoomName = "";
+        currentRoomCreatorId = null;
+        currentMyRoleInRoom = 1;
+        document.getElementById("current-room-title").textContent = "选择左侧群聊开始聊天";
+        document.getElementById("current-room-sub").textContent = "";
+        document.getElementById("msg-content").disabled = true;
+        document.getElementById("btn-send").disabled = true;
+        document.querySelectorAll(".room-item").forEach(el => el.classList.remove("active"));
+        resetChatArea();
+        await refreshMembers();
+        await loadMyRooms();
+        updateDisbandButtonState();
+        notifyLine(`群 ${rid} 已解散`, "sys");
+      } catch (e) {
+        alert("网络异常：" + (e.message || e));
+      } finally {
+        updateDisbandButtonState();
+      }
     }
 
     async function refreshMembers() {
@@ -890,7 +1083,7 @@
         });
         const data = await res.json();
         // #region agent log
-        fetch('http://127.0.0.1:7929/ingest/210e3fd0-ebfd-4f99-8c56-23d76fe0a613',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'3c90a5'},body:JSON.stringify({sessionId:'3c90a5',location:'public.html:refreshMembers',message:'members response',data:{roomId:currentRoomId,status:res.status,ok:res.ok,memCount:Array.isArray(data.members)?data.members.length:null,err:data&&data.error?String(data.error).slice(0,80):null},timestamp:Date.now(),hypothesisId:'H4'})}).catch(function(){});
+        agentDebugIngest({ location: "public.html:refreshMembers", message: "members response", data: { roomId: currentRoomId, status: res.status, ok: res.ok, memCount: Array.isArray(data.members) ? data.members.length : null, err: data && data.error ? String(data.error).slice(0, 80) : null }, timestamp: Date.now(), hypothesisId: "H4" });
         // #endregion
         if (!res.ok) {
           if (hint) hint.textContent = `当前群：ID ${currentRoomId}（加载失败）`;

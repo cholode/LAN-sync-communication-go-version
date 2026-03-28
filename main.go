@@ -113,6 +113,7 @@ func main() {
 		authorized.POST("/rooms/:id/join", api.JoinRoom(hub))
 		authorized.GET("/rooms/:id/members", api.GetRoomMembers())
 		authorized.DELETE("/rooms/:id/members/:user_id", api.RemoveRoomMember(hub))
+		authorized.DELETE("/rooms/:id/disband", api.OwnerDisbandRoom(hub))
 		authorized.DELETE("/upload/cancel", api.CancelUpload)
 		// 群聊管理接口
 		authorized.POST("/rooms", api.CreateRoom(hub))

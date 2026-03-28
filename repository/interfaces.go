@@ -42,6 +42,8 @@ type RoomMemberRepository interface {
 	GetUserRoomIDs(userID int64) ([]int64, error)
 	// 校验用户是否为群成员，用于权限验证
 	CheckIsMember(roomID, userID int64) (bool, error)
+	// GetMemberRole 查询当前用户在群内的角色；ok=false 表示非成员或记录不存在
+	GetMemberRole(roomID, userID int64) (role int8, ok bool, err error)
 	// 查询群成员详细信息
 	GetRoomMembers(roomID int64) ([]*models.User, error)
 }

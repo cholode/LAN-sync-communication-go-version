@@ -28,7 +28,13 @@
   </div>
 
   <script>
-    const API_BASE = "/api/v1";
+    /** 与聊天页一致：nginx 同源反代时留空；否则填 API 根，如 "http://192.168.1.10:8080" */
+    const API_ORIGIN = "";
+    const API_BASE = (function () {
+      const o = (API_ORIGIN || "").replace(/\/+$/, "");
+      if (!o) return "/api/v1";
+      return o + "/api/v1";
+    })();
     if (localStorage.getItem("lan_im_token")) {
       window.location.href = "public.html";
     }

@@ -1,6 +1,7 @@
 package repository
 
 import (
+	"errors"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 	"lan-im-go/models"
@@ -53,6 +54,18 @@ func (r *roomMemberRepoImpl) CheckIsMember(roomID, userID64 int64) (bool, error)
 		Limit(1).
 		Count(&count).Error
 	return count > 0, err
+}
+
+func (r *roomMemberRepoImpl) GetMemberRole(roomID, userID int64) (int8, bool, error) {
+	var m models.RoomMember
+	err := r.db.Where("room_id = ? AND user_id = ?", roomID, userID).First(&m).Error
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return 0, false, nil
+		}
+		return 0, false, err
+	}
+	return m.Role, true, nil
 }
 
 func (r *roomMemberRepoImpl) GetRoomMembers(roomID int64) ([]*models.User, error) {

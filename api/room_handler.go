@@ -223,18 +223,87 @@ func GetMyRooms() gin.HandlerFunc {
 			return
 		}
 
-		// 组装响应数据
+		// 组装响应数据（creator_id、my_role 供前端判断是否可解散）
 		var res []map[string]interface{}
 		for _, r := range rooms {
+			myRole := int8(1)
+			if role, ok, e := repository.RoomMember.GetMemberRole(r.ID, userID); e == nil && ok {
+				myRole = role
+			}
 			res = append(res, map[string]interface{}{
 				"room_id":    r.ID,
 				"room_name":  r.Name,
 				"created_at": r.CreatedAt,
+				"creator_id": r.CreatorID,
+				"my_role":    myRole,
 			})
 		}
 
 		c.JSON(http.StatusOK, gin.H{
 			"rooms": res,
 		})
+	}
+}
+
+// OwnerDisbandRoom 群主（Role=3）或创建者解散当前群
+// 路由：DELETE /api/v1/rooms/:id/disband
+func OwnerDisbandRoom(hub *core.Hub) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		targetRoomID, err := strconv.ParseInt(c.Param("id"), 10, 64)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "非法的群聊 ID"})
+			return
+		}
+		userID := c.GetInt64("user_id")
+		// #region agent log
+		agentDebugLog("H-disband-entry", "room_handler.go:OwnerDisbandRoom:entry", "disband request", map[string]any{"roomID": targetRoomID, "userID": userID})
+		// #endregion
+
+		room, err := repository.Room.GetRoomByID(targetRoomID)
+		if err != nil {
+			c.JSON(http.StatusNotFound, gin.H{"error": "群聊不存在"})
+			return
+		}
+
+		role, isMember, err := repository.RoomMember.GetMemberRole(targetRoomID, userID)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "校验失败"})
+			return
+		}
+		if !isMember {
+			// #region agent log
+			agentDebugLog("H-disband-member", "room_handler.go:OwnerDisbandRoom:403", "not member", map[string]any{"roomID": targetRoomID, "userID": userID})
+			// #endregion
+			c.JSON(http.StatusForbidden, gin.H{"error": "您不是该群成员"})
+			return
+		}
+		if room.CreatorID != userID && role != 3 {
+			// #region agent log
+			agentDebugLog("H-disband-auth", "room_handler.go:OwnerDisbandRoom:403", "not owner nor role3", map[string]any{"roomID": targetRoomID, "userID": userID, "creatorID": room.CreatorID, "role": role})
+			// #endregion
+			c.JSON(http.StatusForbidden, gin.H{"error": "仅群主或创建者可解散该群"})
+			return
+		}
+		// #region agent log
+		agentDebugLog("H-disband-ok", "room_handler.go:OwnerDisbandRoom:allowed", "proceed soft delete", map[string]any{"roomID": targetRoomID, "userID": userID, "creatorID": room.CreatorID, "role": role, "byCreator": room.CreatorID == userID})
+		// #endregion
+
+		if err := repository.Room.SoftDeleteRoom(targetRoomID); err != nil {
+			log.Printf("群主解散群失败: room=%d user=%d err=%v", targetRoomID, userID, err)
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "解散群聊失败"})
+			return
+		}
+
+		sysMsg := &models.Message{
+			RoomID:   targetRoomID,
+			SenderID: 0,
+			Content:  "【系统通知】群主已解散该群聊",
+		}
+		hub.Broadcast <- sysMsg
+		// #region agent log
+		agentDebugLog("H-disband-done", "room_handler.go:OwnerDisbandRoom:success", "soft delete ok", map[string]any{"roomID": targetRoomID, "userID": userID})
+		// #endregion
+
+		c.JSON(http.StatusOK, gin.H{"msg": "群聊已解散"})
 	}
 }
