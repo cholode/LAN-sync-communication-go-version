@@ -35,8 +35,8 @@ FROM alpine:3.18
 LABEL maintainer="YourName <your.email@example.com>"
 LABEL description="LiteIM Backend Server"
 
-# 安装必备依赖：时区数据、CA证书（支持HTTPS请求）
-RUN apk --no-cache add tzdata ca-certificates && \
+# 安装必备依赖：时区数据、CA证书（支持HTTPS请求）、su-exec（entrypoint 降权）
+RUN apk --no-cache add tzdata ca-certificates su-exec && \
     cp /usr/share/zoneinfo/Asia/Shanghai /etc/localtime && \
     echo "Asia/Shanghai" > /etc/timezone
 
@@ -45,19 +45,20 @@ WORKDIR /app
 # 从构建阶段复制编译完成的二进制文件
 COPY --from=builder /build/im-server /app/
 
-# 安全规范：使用非root用户运行服务，降低容器安全风险
+# 安全规范：业务进程使用非 root；启动时 root 修正挂载卷权限后由 entrypoint 降为 imuser
 RUN adduser -S -D -H -h /app imuser
 
 RUN mkdir -p /app/data/uploads /app/data/temp_chunks && \
     chown -R imuser:nobody /app && \
     chmod +x /app/im-server
 
-USER imuser
+COPY deploy/backend-entrypoint.sh /app/docker-entrypoint.sh
+RUN chmod +x /app/docker-entrypoint.sh
+
+USER root
 
 # 声明服务端口
 EXPOSE 8080
 
-RUN 
-
-# 启动服务
+ENTRYPOINT ["/app/docker-entrypoint.sh"]
 CMD ["/app/im-server"]

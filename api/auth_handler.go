@@ -90,7 +90,7 @@ func RegisterHandler(c *gin.Context) {
 		return
 	}
 
-	//使用bcrypt加密密码，禁止明文存储
+	//使用bcrypt加密密码，不使用明文存储
 	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "密码加密失败，请稍后再试"})

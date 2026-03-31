@@ -5,7 +5,6 @@ import (
 	"lan-im-go/models"
 	"lan-im-go/repository"
 	"log"
-	"sync"
 	"time"
 
 	"github.com/bwmarrin/snowflake"
@@ -43,8 +42,6 @@ type Hub struct {
 	DBBuffer       chan *models.Message
 	RoomActionChan chan *RoomAction
 	Kick           chan int64
-
-	mutex sync.RWMutex
 }
 
 func NewHub() *Hub {

@@ -19,6 +19,7 @@ type chatHistoryMsgDTO struct {
 	Content   string    `json:"content"`
 	CreatedAt time.Time `json:"created_at"`
 }
+
 // GetChatHistory 获取群聊历史消息（游标分页）
 // 路由：GET /api/v1/rooms/:id/messages?cursor=1050&limit=50
 func GetChatHistory() gin.HandlerFunc {
@@ -33,13 +34,7 @@ func GetChatHistory() gin.HandlerFunc {
 		// 权限校验：仅群成员可查询消息
 		userID := c.GetInt64("user_id")
 		isMember, err := repository.RoomMember.CheckIsMember(roomID, userID)
-		// #region agent log
-		chkErr := ""
-		if err != nil {
-			chkErr = err.Error()
-		}
-		agentDebugLog("H4", "messages_handler.go:GetChatHistory:memberCheck", "CheckIsMember", map[string]any{"roomID": roomID, "userID": userID, "isMember": isMember, "err": chkErr})
-		// #endregion
+
 		if err != nil || !isMember {
 			c.JSON(http.StatusForbidden, gin.H{"error": "您不是该群成员，无权查看聊天记录"})
 			return
@@ -62,11 +57,7 @@ func GetChatHistory() gin.HandlerFunc {
 		// 游标分页查询消息，避免深分页性能问题
 		messages, err := repository.Message.GetHistoryByCursor(roomID, cursorMsgID, limit)
 		// #region agent log
-		if err != nil {
-			agentDebugLog("H4", "messages_handler.go:GetChatHistory:query", "GetHistoryByCursor fail", map[string]any{"roomID": roomID, "err": err.Error()})
-		} else {
-			agentDebugLog("H4", "messages_handler.go:GetChatHistory:query", "GetHistoryByCursor ok", map[string]any{"roomID": roomID, "msgCount": len(messages)})
-		}
+
 		// #endregion
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "获取历史消息失败"})
