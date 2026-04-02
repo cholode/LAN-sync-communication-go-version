@@ -54,7 +54,6 @@ services:
     environment:
       # 修复语法错误：彻底删除无效的 db: 前缀
       - DB_DSN=root:${DB_PASSWORD}@tcp(db:3306)/${DB_NAME}?charset=utf8mb4&parseTime=True&loc=Local
-      # 与 volumes 中 ./data_storage:/app/data 一致；强制写入挂载目录，避免不可写时回退到临时目录导致重启后下载 404
       - LAN_IM_DATA_DIR=/app/data
     deploy:
       resources:
@@ -65,7 +64,7 @@ services:
           cpus: '0.5'
           memory: 1G
     volumes:
-      - ./data_storage:/app/data
+      - ./data:/app/data
     depends_on:
       db:
         condition: service_healthy

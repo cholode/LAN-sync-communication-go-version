@@ -50,8 +50,8 @@ func NewHub() *Hub {
 		users:          make(map[int64]*Client),          // 存储用户与客户端的关联关系
 		Subscribe:      make(chan *Subscription),
 		Unsubscribe:    make(chan *Subscription),
-		Broadcast:      make(chan *models.Message, 1024),  // 缓冲通道，应对消息流量峰值
-		DBBuffer:       make(chan *models.Message, 50000), // 异步持久化缓冲通道
+		Broadcast:      make(chan *models.Message, 1024), // 缓冲通道，应对消息流量峰值
+		DBBuffer:       make(chan *models.Message, 5000), // 异步持久化缓冲通道
 		RoomActionChan: make(chan *RoomAction, 100),
 		Kick:           make(chan int64),
 	}
@@ -110,9 +110,9 @@ func (h *Hub) Run() {
 			if clients, ok := h.rooms[msg.RoomID]; ok {
 				for client := range clients {
 					// 跳过消息发送者，避免重复接收
-					// if client.UserID == msg.SenderID {    #测试
-					// 	continue
-					// }
+					if client.UserID == msg.SenderID { //测试
+						continue
+					}
 					select {
 					case client.Send <- payload:
 					default:
