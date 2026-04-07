@@ -9,6 +9,7 @@ import (
 	"lan-im-go/repository"
 	"log"
 	"net/http"
+	"sync"
 	//"time"
 )
 
@@ -22,6 +23,7 @@ var upgrader = websocket.Upgrader{
 		// return strings.Contains(r.Header.Get("Origin"), "yourdomain.com")
 		return true // 开发环境放行跨域
 	},
+	WriteBufferPool: &sync.Pool{New: func() interface{} { return make([]byte, 4096) }},
 }
 
 // WsEndpoint WebSocket连接入口

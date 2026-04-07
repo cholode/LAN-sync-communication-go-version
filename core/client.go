@@ -12,7 +12,7 @@ import (
 const (
 	// WebSocket 配置参数
 	writeWait      = 10 * time.Second    // 写入超时时间
-	pongWait       = 60 * time.Second    // 客户端心跳响应超时时间
+	pongWait       = 30 * time.Second    // 客户端心跳响应超时时间
 	pingPeriod     = (pongWait * 9) / 10 // 服务端心跳发送频率
 	maxMessageSize = 4096                // 限制单条消息最大长度，防止超大消息占用过多内存
 )

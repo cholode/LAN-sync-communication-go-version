@@ -16,10 +16,9 @@ const onlineUserGauge = new Gauge('custom_online_user_count');
 // 压测沙盘全局拓扑配置
 // ============================================================================
 const TOTAL_VUS = 10000; // 全局物理并发连接总数
-const RAMP_UP_DURATION = '5m'; // 节点爬坡阶段：系统预热与连接建立
-const FIRE_DURATION = '6m'; // 极值压测阶段：高频写扩散风暴
-const SILENCE_DURATION = '1m'; // 物理静默阶段：测试 TCP 状态机与 Goroutine 泄漏
-const RAMP_DOWN_DURATION = '2m'; // 平滑降级阶段：连接释放与内存回收
+const RAMP_UP_DURATION = '2m'; // 【架构调优】节点爬坡阶段：拉长至 2 分钟平滑建立连接
+const FIRE_DURATION = '5m'; // 极值压测阶段：持续 5 分钟火力输出
+const RAMP_DOWN_DURATION = '1m'; // 平滑降级阶段：最后 1 分钟陆续断开
 const TOTAL_ROOMS = 100; // 业务沙盘：测试群组总数
 const ACTIVE_PER_ROOM = 10; // 业务沙盘：每个群组内的火力输出节点数
 const BASE_URL = 'http://127.0.0.1:8080/api/v1';
@@ -34,10 +33,9 @@ export const options = {
       executor: 'ramping-vus',
       startVUs: 0,
       stages: [
-        { duration: RAMP_UP_DURATION, target: TOTAL_VUS },
-        { duration: FIRE_DURATION, target: TOTAL_VUS },
-        { duration: SILENCE_DURATION, target: TOTAL_VUS },
-        { duration: RAMP_DOWN_DURATION, target: 0 },
+        { duration: RAMP_UP_DURATION, target: TOTAL_VUS }, // 0~2分钟：平滑建连，减轻网关握手压力
+        { duration: FIRE_DURATION, target: TOTAL_VUS },    // 2~7分钟：保持满载并发，检验系统极值
+        { duration: RAMP_DOWN_DURATION, target: 0 },       // 7~8分钟：物理连接销毁，释放 FD
       ],
       gracefulRampDown: '10s', // 允许进行中请求拥有 10 秒的清理缓冲期
     },
@@ -107,18 +105,14 @@ export default function (data) {
 
   // 必须使用特定前缀触发后端哈希旁路机制
   const userAccount = { username: `silent_vu_${vuId}`, password: "password123" };
-  const headers = { 'Content-Type': 'application/json' };
+  const headers = { 
+      'Content-Type': 'application/json',
+      'Connection': 'close'
+  };
 
   // ------------------------------------------------------------------------
   // 协议握手层: HTTP 认证与路由加入
   // ------------------------------------------------------------------------
-  // const regRes = http.post(`${BASE_URL}/register`, JSON.stringify(userAccount), { headers });
-  // if (regRes.status !== 200 && regRes.status !== 400 && regRes.status !== 409) {
-  //   httpReqFailed.add(1);
-  //   sleep(60);
-  //   return;
-  // }
-
   const loginRes = http.post(`${BASE_URL}/login`, JSON.stringify(userAccount), {
     headers,
     responseType: 'text'
@@ -131,7 +125,7 @@ export default function (data) {
 
   const token = JSON.parse(loginRes.body).token;
   const joinRes = http.post(`${BASE_URL}/rooms/${roomId}/join`, null, {
-    headers: { Authorization: `Bearer ${token}` }
+    headers: { Authorization: `Bearer ${token}`,'Connection': 'close' }
   });
   if (joinRes.status !== 200 && joinRes.status !== 400) {
     httpReqFailed.add(1);
@@ -156,14 +150,19 @@ export default function (data) {
       // 活跃节点火力调度机制
       if (isActiveUser) {
         const elapsedMs = new Date().getTime() - exec.scenario.startTime;
-        const fireStartWaitMs = 300000 - elapsedMs; // 距爬坡结束剩余毫秒数 (5m)
-        const silenceStartMs = 300000 + 360000; // 静默期绝对时间阈值 (5m + 6m = 11m)
+        
+        // 【核心物理修正】爬坡期绝对时间阈值：2m = 120000ms
+        const fireStartWaitMs = 120000 - elapsedMs; 
+        
+        // 【核心物理修正】停止开火的绝对时间阈值：爬坡 2m + 开火 5m = 7m (420000ms)
+        const stopFiringMs = 420000; 
 
         const startFiring = () => {
           msgTimer = socket.setInterval(() => {
             const currentElapsedMs = new Date().getTime() - exec.scenario.startTime;
-            // 触发静默阻断机制
-            if (currentElapsedMs >= silenceStartMs) {
+            
+            // 触发火力阻断机制：一旦触碰 7 分钟时间线，立刻停止发送并准备撤离
+            if (currentElapsedMs >= stopFiringMs) {
               clearInterval(msgTimer); // 标准的全局定时器回收调用
               return;
             }

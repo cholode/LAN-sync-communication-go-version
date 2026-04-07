@@ -109,10 +109,6 @@ func (h *Hub) Run() {
 			// 3. 高效路由转发消息
 			if clients, ok := h.rooms[msg.RoomID]; ok {
 				for client := range clients {
-					// 跳过消息发送者，避免重复接收
-					if client.UserID == msg.SenderID { //测试
-						continue
-					}
 					select {
 					case client.Send <- payload:
 					default:

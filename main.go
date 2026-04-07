@@ -4,7 +4,7 @@ import (
 	"github.com/gin-contrib/cors"
 	"github.com/gin-contrib/pprof"
 	"github.com/gin-gonic/gin"
-	//"io"
+	"io"
 	"lan-im-go/api"
 	"lan-im-go/core"
 	"lan-im-go/infrastructure"
@@ -26,7 +26,7 @@ func main() {
 			panic("pprof start failed: " + err.Error())
 		}
 	}()
-	//log.SetOutput(io.Discard)
+	log.SetOutput(io.Discard)
 	// ========================================================================
 	// 阶段1：环境与基础设施初始化
 	// ========================================================================
@@ -137,8 +137,20 @@ func main() {
 	if port == "" {
 		port = "8080"
 	}
-	log.Printf("LAN-IM服务端启动成功，监听端口 :%s", port)
-	if err := r.Run(":" + port); err != nil {
-		log.Fatalf("[错误] HTTP服务启动失败: %v", err)
+
+	srv := &http.Server{
+		Addr:              ":" + port,
+		Handler:           r,                // 将 Gin 路由引擎强行挂载到底层 Server
+		ReadTimeout:       5 * time.Second,  // 读取完整请求头+体的最长时间
+		ReadHeaderTimeout: 3 * time.Second,  // 防御 Slowloris 慢速头部攻击
+		WriteTimeout:      10 * time.Second, // 响应写回的最长时间
+		IdleTimeout:       15 * time.Second, // 底层 TCP Keep-Alive 空闲最大存活时间
+	}
+
+	log.Printf("[架构就绪] LAN-IM 服务端启动成功，监听端口 :%s", port)
+
+	// 执行带有异常捕获的底层启动调用
+	if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+		log.Fatalf("[致命错误] 网关崩溃: %v", err)
 	}
 }
